@@ -1,0 +1,154 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ─────────────────────────────────────────────────────────────
+   Design System Tokens — Momentum Labz CRM v1.0
+   Source: momentumlabzz_CRM_Design_System_v1.0 § 11
+   ───────────────────────────────────────────────────────────── */
+:root {
+  /* Neutrals — exact logo ink (#1C1C1C) extended into a full scale */
+  --neutral-0: #FFFFFF;
+  --neutral-50: #F7F7F7;
+  --neutral-100: #EDEDED;
+  --neutral-200: #D9D9D9;
+  --neutral-300: #B8B8B8;
+  --neutral-400: #8F8F8F;
+  --neutral-500: #737373;
+  --neutral-600: #595959;
+  --neutral-700: #404040;
+  --neutral-800: #2E2E2E;
+  --neutral-900: #1C1C1C;
+
+  /* Accent — Muted Gold (brand-consistent, live on momentumlabzz.com) */
+  --accent-50: #FBF6E9;
+  --accent-100: #F2E6C4;
+  --accent-300: #DDBE6E;
+  --accent-500: #C8A84B;
+  --accent-700: #9C7F31;
+
+  /* Semantic / Status — desaturated, premium muted tone */
+  --success-bg: #E9F5EC;
+  --success-text: #2F7D4F;
+  --warning-bg: #FBF3E4;
+  --warning-text: #B8873B;
+  --danger-bg: #FBEAEA;
+  --danger-text: #C64545;
+  --info-bg: #EAF1FB;
+  --info-text: #3E6FB0;
+
+  /* Corner radius — soft and consistent, never sharp on cards */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+  --radius-full: 999px;
+
+  /* Elevation — extremely subtle, flat + soft system */
+  --shadow-sm: 0 1px 2px rgba(28, 28, 28, 0.04);
+  --shadow-md: 0 4px 12px rgba(28, 28, 28, 0.08);
+  --shadow-lg: 0 12px 32px rgba(28, 28, 28, 0.12);
+}
+
+/* ─────────────────────────────────────────────────────────────
+   Base Styles
+   ───────────────────────────────────────────────────────────── */
+@layer base {
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box;
+  }
+
+  html {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  body {
+    background-color: var(--neutral-50);
+    color: var(--neutral-600);
+    font-family: 'Inter', sans-serif;
+    font-size: 14px;
+    line-height: 20px;
+    /* Tabular numerals — non-negotiable for a CRM. Revenue figures
+       visually "wobble" as digits change width without this. */
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Headings always use neutral-900 (exact logo ink, never pure #000) */
+  h1, h2, h3, h4, h5, h6 {
+    color: var(--neutral-900);
+    font-weight: 600;
+  }
+
+  /* Focus ring — accent-500 at 20% opacity, not the harsh browser blue */
+  :focus-visible {
+    outline: 2px solid rgba(200, 168, 75, 0.4);
+    outline-offset: 2px;
+  }
+
+  /* Scrollbar — minimal, matches flat aesthetic */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: var(--neutral-200);
+    border-radius: var(--radius-full);
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--neutral-300);
+  }
+}
+
+/* ─────────────────────────────────────────────────────────────
+   Typography utility classes (mirrors the type scale tokens)
+   ───────────────────────────────────────────────────────────── */
+@layer utilities {
+  .text-display {
+    font-size: 32px;
+    line-height: 40px;
+    font-weight: 600;
+  }
+  .text-h1 {
+    font-size: 24px;
+    line-height: 32px;
+    font-weight: 600;
+  }
+  .text-h2 {
+    font-size: 18px;
+    line-height: 26px;
+    font-weight: 600;
+  }
+  .text-h3 {
+    font-size: 15px;
+    line-height: 22px;
+    font-weight: 600;
+  }
+  .text-body {
+    font-size: 14px;
+    line-height: 20px;
+    font-weight: 400;
+  }
+  .text-body-medium {
+    font-size: 14px;
+    line-height: 20px;
+    font-weight: 500;
+  }
+  .text-small {
+    font-size: 13px;
+    line-height: 18px;
+    font-weight: 400;
+  }
+  /* Micro: uppercase eyebrows, badge text, table column headers */
+  .text-micro {
+    font-size: 11px;
+    line-height: 14px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+}

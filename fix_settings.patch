@@ -1,0 +1,47 @@
+--- src/app/(app)/settings/page.tsx
++++ src/app/(app)/settings/page.tsx
+@@ -9,22 +9,15 @@
+ import { GripVertical, Edit2, Trash2, Plus, X } from 'lucide-react';
+ 
+ export default function SettingsPage() {
+-  const searchParams = useSearchParams();
+-  const router = useRouter();
+-  const currentTab = searchParams.get('tab') || 'stages';
+-
+-  function setTab(tab: string) {
+-    router.push(`/settings?tab=${tab}`);
+-  }
++  const [activeTab, setActiveTab] = useState('pipeline');
+ 
+   const tabs = [
+-    { id: 'stages', label: 'Pipeline Stages' },
++    { id: 'pipeline', label: 'Pipeline Stages' },
+     { id: 'services', label: 'Services' },
+     { id: 'tags', label: 'Tags' },
+     { id: 'currency', label: 'Currency Defaults' },
+-    { id: 'team', label: 'Team Members' },
++    { id: 'team', label: 'Team' },
+     { id: 'custom_fields', label: 'Lead Custom Fields' },
+   ];
+ 
+   return (
+@@ -48,15 +41,16 @@
+         ))}
+       </div>
+ 
+       <div className="flex-1 overflow-auto pb-12">
+-        {currentTab === 'stages' && <PipelineManager />}
+-        {currentTab === 'services' && <ServicesManager />}
+-        {currentTab === 'tags' && <TagsManager />}
+-        {currentTab === 'currency' && <CurrencyManager />}
+-        {currentTab === 'team' && <TeamManager />}
++        {activeTab === 'pipeline' && <PipelineManager />}
++        {activeTab === 'services' && <ServicesManager />}
++        {activeTab === 'tags' && <TagsManager />}
++        {activeTab === 'currency' && <CurrencyManager />}
++        {activeTab === 'team' && <TeamManager />}
++        {activeTab === 'custom_fields' && <CustomFieldsManager />}
+       </div>
+     </div>
+   );
+ }
