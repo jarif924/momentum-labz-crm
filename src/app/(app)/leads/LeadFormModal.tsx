@@ -25,7 +25,10 @@ export function LeadFormModal({ isOpen, onClose, lead, onSave }: { isOpen: boole
     source: 'cold_outreach',
     stage: 'Prospect Found',
     deal_value: '',
-    currency: 'USD'
+    currency: 'USD',
+    niche: '',
+    demo_status: '',
+    running_meta_ads: false
   });
 
   const [contacts, setContacts] = useState<any[]>([]);
@@ -52,9 +55,13 @@ export function LeadFormModal({ isOpen, onClose, lead, onSave }: { isOpen: boole
           source: lead.source || 'cold_outreach',
           stage: lead.stage || 'Prospect Found',
           deal_value: lead.deal_value || '',
-          currency: lead.currency || 'USD',
+        currency: lead.currency || 'USD',
+        niche: lead.niche || '',
+        demo_status: lead.demo_status || '',
+        running_meta_ads: lead.running_meta_ads || false,
           custom_fields: lead.custom_fields || {},
-          service_line: lead.service_line || 'web_development'
+          service_line: lead.service_line || 'web_development',
+          tags: lead.lead_tags?.map((lt: any) => lt.tag_id) || []
         });
       } else {
         setFormData({
@@ -70,7 +77,11 @@ export function LeadFormModal({ isOpen, onClose, lead, onSave }: { isOpen: boole
           deal_value: '',
           currency: 'USD',
           custom_fields: {},
-          service_line: 'web_development'
+          service_line: 'web_development',
+          tags: [],
+          niche: '',
+          demo_status: '',
+          running_meta_ads: false
         });
       }
     }
@@ -125,7 +136,10 @@ export function LeadFormModal({ isOpen, onClose, lead, onSave }: { isOpen: boole
         source: formData.source,
         stage: formData.stage,
         deal_value: formData.deal_value ? parseFloat(formData.deal_value) : null,
-        currency: formData.currency,
+      currency: formData.currency,
+      niche: formData.niche,
+      demo_status: formData.demo_status,
+      running_meta_ads: formData.running_meta_ads,
         service_line: formData.service_line,
         custom_fields: formData.custom_fields
       };
@@ -215,6 +229,32 @@ export function LeadFormModal({ isOpen, onClose, lead, onSave }: { isOpen: boole
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <Input 
+            label="Niche / Industry" 
+            value={formData.niche}
+            onChange={(e) => setFormData({...formData, niche: e.target.value})}
+            placeholder="e.g. Clinics"
+          />
+          <Input 
+            label="Demo Status" 
+            value={formData.demo_status}
+            onChange={(e) => setFormData({...formData, demo_status: e.target.value})}
+            placeholder="e.g. Ready"
+          />
+        </div>
+
+        <label className="flex items-center gap-2 cursor-pointer mt-1 mb-2 text-sm text-neutral-700">
+          <input 
+            type="checkbox" 
+            className="rounded border-neutral-300 text-neutral-900 focus:ring-neutral-900"
+            checked={formData.running_meta_ads}
+            onChange={(e) => setFormData({...formData, running_meta_ads: e.target.checked})}
+          />
+          Currently running Meta Ads?
+        </label>
+
           <Input label="Deal Value" type="number" value={formData.deal_value} onChange={e => setFormData({...formData, deal_value: e.target.value})} />
           <Select label="Currency" value={formData.currency} onChange={e => setFormData({...formData, currency: e.target.value})}>
             <option value="USD">USD</option>

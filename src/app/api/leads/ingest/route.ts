@@ -16,8 +16,8 @@ export async function POST(req: NextRequest) {
   try {
     // 1. API Key Validation
     const apiKey = req.headers.get('x-crm-api-key');
-    console.log('Received API Key:', apiKey, 'Expected:', process.env.CRM_INGEST_API_KEY);
-    if (!apiKey || (apiKey !== process.env.CRM_INGEST_API_KEY && apiKey !== 'development_key' && apiKey !== 'kirekikhbr@@$$924')) {
+    const expectedKey = process.env.CRM_INGEST_API_KEY;
+    if (!apiKey || !expectedKey || apiKey !== expectedKey) {
       return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401, headers: CORS_HEADERS });
     }
 

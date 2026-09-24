@@ -18,6 +18,7 @@ import {
   Layers,
   Wallet,
   ArrowDownLeft
+, Lightbulb
 } from 'lucide-react'
 
 // ─── Nav configuration — Section 4 of the implementation plan ─────────────
@@ -55,6 +56,13 @@ const NAV_GROUPS = [
     label: 'Delivery',
     items: [
       { href: '/projects', label: 'Projects', icon: Layers },
+    ],
+  },
+  
+  {
+    label: 'Workspace',
+    items: [
+      { href: '/brainstorming', label: 'Brainstorming', icon: Lightbulb },
     ],
   },
   {
