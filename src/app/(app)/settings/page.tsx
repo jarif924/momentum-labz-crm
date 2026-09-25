@@ -276,6 +276,8 @@ function TeamManager() {
   const [newName, setNewName] = useState('')
   const [newEmail, setNewEmail] = useState('')
   const [newRole, setNewRole] = useState('viewer')
+  const [saving, setSaving] = useState(false)
+  const [addError, setAddError] = useState<string | null>(null)
 
   useEffect(() => {
     async function fetchUsers() {
@@ -289,15 +291,23 @@ function TeamManager() {
   }, [])
 
   async function handleAdd() {
-    if (!newName.trim() || !newEmail.trim()) return
+    if (!newName.trim() || !newEmail.trim()) {
+      setAddError('Enter a name and an email address.')
+      return
+    }
+    setSaving(true)
+    setAddError(null)
     const id = crypto.randomUUID()
     const { data, error } = await supabase.from('users').insert({
       id, full_name: newName.trim(), email: newEmail.trim(), role: newRole
     }).select().single()
-    if (data && !error) {
-      setUsers([...users, data as any])
-      setNewName(''); setNewEmail('')
+    setSaving(false)
+    if (error || !data) {
+      setAddError(`Could not add member: ${error?.message ?? 'no data returned'}`)
+      return
     }
+    setUsers([...users, data as any])
+    setNewName(''); setNewEmail('')
   }
 
   async function handleDelete(id: string) {
@@ -328,8 +338,13 @@ function TeamManager() {
             <option value="viewer">Viewer</option>
           </Select>
         </div>
-        <Button onClick={handleAdd}>Add Member</Button>
+        <Button onClick={handleAdd} disabled={saving}>{saving ? 'Adding…' : 'Add Member'}</Button>
       </div>
+      {addError && (
+        <div className="px-4 py-2 bg-danger-bg border-b border-neutral-100">
+          <p className="text-small text-danger-text">{addError}</p>
+        </div>
+      )}
       <div className="divide-y divide-neutral-100">
         {users.map(u => (
           <div key={u.id} className="flex justify-between items-center p-4 hover:bg-neutral-50">
