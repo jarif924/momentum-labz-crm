@@ -8,6 +8,8 @@ import { Button } from '@/components/ui/Forms';
 import { Plus, List, LayoutGrid, AlertOctagon, CheckCircle2, Circle, MessageSquareWarning } from 'lucide-react';
 import { TasksKanban } from './TasksKanban';
 import { TaskModal } from './TaskModal';
+import { useToast } from '@/components/ui/Toast';
+import { friendlyError } from '@/lib/errors';
 
 export default function TasksPage() {
   const supabase = createBrowserClient<Database>(
@@ -18,7 +20,10 @@ export default function TasksPage() {
   const [tasks, setTasks] = useState<any[]>([]);
   const [projects, setProjects] = useState<any[]>([]);
   const [blockers, setBlockers] = useState<any[]>([]);
-  
+  const [leads, setLeads] = useState<any[]>([]);
+  const [users, setUsers] = useState<any[]>([]);
+  const toast = useToast();
+
   const [viewMode, setViewMode] = useState<'developer' | 'creative' | 'founder'>('creative');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editTask, setEditTask] = useState<any>(null);
@@ -28,18 +33,32 @@ export default function TasksPage() {
   }, []);
 
   const fetchData = async () => {
-    const { data: t } = await supabase.from('tasks').select('*, project:projects(name, status)').order('created_at', { ascending: false });
-    const { data: p } = await supabase.from('projects').select('*');
-    const { data: b } = await supabase.from('task_comments').select('*, task:tasks(title, project_id, project:projects(name))').or('is_blocker.eq.true,is_decision.eq.true').order('created_at', { ascending: false });
-    
-    if (t) setTasks(t);
-    if (p) setProjects(p);
-    if (b) setBlockers(b);
+    const [tRes, pRes, bRes, lRes, uRes] = await Promise.all([
+      supabase.from('tasks').select('*, project:projects(name, status), users(full_name)').order('created_at', { ascending: false }),
+      supabase.from('projects').select('*'),
+      supabase.from('task_comments').select('*, task:tasks(title, project_id, project:projects(name))').or('is_blocker.eq.true,is_decision.eq.true').order('created_at', { ascending: false }),
+      supabase.from('leads').select('id, contacts(full_name)'),
+      supabase.from('users').select('id, full_name').order('full_name'),
+    ]);
+    const loadError = tRes.error || pRes.error || bRes.error || lRes.error || uRes.error;
+    if (loadError) toast.error(`Couldn't load tasks: ${friendlyError(loadError)}`);
+
+    if (tRes.data) setTasks(tRes.data);
+    if (pRes.data) setProjects(pRes.data);
+    if (bRes.data) setBlockers(bRes.data);
+    if (lRes.data) setLeads(lRes.data);
+    if (uRes.data) setUsers(uRes.data);
+  };
+
+  // `completed` and `status` must stay in sync: the list view filters on one, the board on the other
+  const setTaskStatus = async (id: string, status: string) => {
+    const { error } = await supabase.from('tasks').update({ status, completed: status === 'Done' }).eq('id', id);
+    if (error) toast.error(`Couldn't update task: ${friendlyError(error)}`);
+    fetchData();
   };
 
   const toggleTaskStatus = async (task: any) => {
-    await supabase.from('tasks').update({ completed: !task.completed }).eq('id', task.id);
-    fetchData();
+    await setTaskStatus(task.id, task.completed ? 'To Do' : 'Done');
   };
 
   return (
@@ -68,7 +87,7 @@ export default function TasksPage() {
       </div>
 
       {viewMode === 'creative' && (
-        <TasksKanban tasks={tasks} onStatusChange={async (id, status) => { await supabase.from('tasks').update({ status }).eq('id', id); fetchData(); }} onCardClick={(t) => { setEditTask(t); setIsModalOpen(true); }} />
+        <TasksKanban tasks={tasks} onStatusChange={setTaskStatus} onCardClick={(t) => { setEditTask(t); setIsModalOpen(true); }} />
       )}
 
       {viewMode === 'developer' && (
@@ -148,8 +167,10 @@ export default function TasksPage() {
       {isModalOpen && (
         <TaskModal 
           isOpen={true}
-          task={editTask} 
-          projects={projects} 
+          task={editTask}
+          projects={projects}
+          leads={leads}
+          users={users}
           onClose={() => { setIsModalOpen(false); fetchData(); }} 
         />
       )}

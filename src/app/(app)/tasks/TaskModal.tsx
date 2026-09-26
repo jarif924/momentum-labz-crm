@@ -4,6 +4,8 @@ import { Modal } from '@/components/ui/Modal';
 import { Button, Input, Select } from '@/components/ui/Forms';
 import { createBrowserClient } from '@supabase/ssr';
 import { Plus, Trash2 } from 'lucide-react';
+import { useToast } from '@/components/ui/Toast';
+import { friendlyError } from '@/lib/errors';
 
 export function TaskModal({ 
   isOpen, 
@@ -28,6 +30,7 @@ export function TaskModal({
   );
 
   const [loading, setLoading] = useState(false);
+  const toast = useToast();
   const [formData, setFormData] = useState<any>({
     title: '',
     description: '',
@@ -62,6 +65,9 @@ export function TaskModal({
         assigned_to: task.assigned_to || '',
         due_date: task.due_at ? new Date(task.due_at).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
         is_client_visible: task.is_client_visible || false,
+        task_type: task.task_type || 'feature',
+        dri_name: task.dri_name || '',
+        loom_url: task.loom_url || '',
         requires_client_approval: task.requires_client_approval || false,
         is_out_of_scope: task.is_out_of_scope || false,
         labels: task.labels || [],
@@ -75,8 +81,12 @@ export function TaskModal({
         priority: 'medium',
         lead_id: '',
         project_id: '',
+        assigned_to: '',
         due_date: new Date().toISOString().split('T')[0],
         is_client_visible: false,
+        task_type: 'feature',
+        dri_name: '',
+        loom_url: '',
         requires_client_approval: false,
         is_out_of_scope: false,
         labels: [],
@@ -86,7 +96,9 @@ export function TaskModal({
   }, [task, isOpen]);
 
   const handleSubmit = async () => {
-    if (!formData.title) return;
+    if (!formData.title?.trim()) { toast.error('Enter a task title.'); return; }
+    if (!formData.due_date || Number.isNaN(new Date(formData.due_date).getTime())) { toast.error('Choose a due date.'); return; }
+    if (loading) return;
     setLoading(true);
     try {
       const payload = {
@@ -103,19 +115,24 @@ export function TaskModal({
         is_out_of_scope: formData.is_out_of_scope,
         labels: formData.labels,
         checklist: formData.checklist,
+        task_type: formData.task_type || 'feature',
+        dri_name: formData.dri_name?.trim() || null,
+        loom_url: formData.loom_url?.trim() || null,
         // sync completed boolean with status for backwards compatibility
         completed: formData.status === 'Done'
       };
 
-      if (task?.id) {
-        await (supabase.from('tasks') as any).update(payload).eq('id', task.id);
+      const { error } = task?.id
+        ? await (supabase.from('tasks') as any).update(payload).eq('id', task.id)
+        : await (supabase.from('tasks') as any).insert(payload);
+      if (error) {
+        toast.error(`Couldn't save task: ${friendlyError(error)}`);
       } else {
-        await (supabase.from('tasks') as any).insert(payload);
+        toast.success(task?.id ? 'Task updated' : 'Task created');
+        if (onSave) onSave(); else onClose();
       }
-      if (onSave) if (onSave) onSave(); else onClose(); else onClose();
     } catch (e) {
-      console.error(e);
-      alert('Failed to save task');
+      toast.error(`Couldn't save task: ${friendlyError(e)}`);
     }
     setLoading(false);
   };
@@ -160,8 +177,14 @@ export function TaskModal({
   const handleDelete = async () => {
     if (task?.id && confirm('Are you sure you want to delete this task?')) {
       setLoading(true);
-      await (supabase.from('tasks') as any).delete().eq('id', task.id);
-      if(onSave) onSave(); else onClose();
+      const { error } = await (supabase.from('tasks') as any).delete().eq('id', task.id);
+      setLoading(false);
+      if (error) {
+        toast.error(`Couldn't delete task: ${friendlyError(error)}`);
+        return;
+      }
+      toast.success('Task deleted');
+      if (onSave) onSave(); else onClose();
     }
   };
 
