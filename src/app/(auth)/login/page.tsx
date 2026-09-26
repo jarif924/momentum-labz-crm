@@ -4,12 +4,11 @@ export const dynamic = 'force-dynamic'
 
 import { useState } from 'react'
 import Image from 'next/image'
-import { useRouter } from 'next/navigation'
+
 import { Mail, Lock, ArrowRight, Loader2, Sparkles } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 
 export default function LoginPage() {
-  const router = useRouter()
   const supabase = createClient()
 
   const [mode, setMode] = useState<'password' | 'magic-link'>('password')
@@ -24,16 +23,20 @@ export default function LoginPage() {
     setError(null)
     setLoading(true)
 
-    const { error } = await supabase.auth.signInWithPassword({ email, password })
+    try {
+      const { error } = await supabase.auth.signInWithPassword({ email, password })
 
-    if (error) {
-      setError(error.message)
+      if (error) {
+        setError(error.message)
+        setLoading(false)
+        return
+      }
+
+      window.location.href = '/'
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'An unexpected error occurred')
       setLoading(false)
-      return
     }
-
-    router.push('/')
-    router.refresh()
   }
 
   async function handleMagicLink(e: React.FormEvent) {

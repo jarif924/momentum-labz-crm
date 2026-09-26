@@ -1,3 +1,5 @@
+import { Avatar } from "@/components/ui/Avatar";
+
 'use client';
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
@@ -34,7 +36,7 @@ export default function TasksPage() {
 
   const fetchData = async () => {
     const [tRes, pRes, bRes, lRes, uRes] = await Promise.all([
-      supabase.from('tasks').select('*, project:projects(name, status), users(full_name)').order('created_at', { ascending: false }),
+      supabase.from('tasks').select('*, project:projects(name, status), users(full_name, avatar_url)').order('created_at', { ascending: false }),
       supabase.from('projects').select('*'),
       supabase.from('task_comments').select('*, task:tasks(title, project_id, project:projects(name))').or('is_blocker.eq.true,is_decision.eq.true').order('created_at', { ascending: false }),
       supabase.from('leads').select('id, contacts(full_name)'),
@@ -116,7 +118,16 @@ export default function TasksPage() {
                     </td>
                     <td className="px-4 py-3 font-medium text-neutral-900">{task.title}</td>
                     <td className="px-4 py-3 text-neutral-500">{task.project?.name || 'No Project'}</td>
-                    <td className="px-4 py-3 font-medium text-neutral-700">{task.dri_name || 'Unassigned'}</td>
+                    <td className="px-4 py-3">
+                      {task.users?.full_name ? (
+                        <div className="flex items-center gap-1.5 text-neutral-700">
+                          <Avatar name={task.users.full_name} url={task.users.avatar_url} size="sm" />
+                          <span className="font-medium text-[13px]">{task.users.full_name.split(' ')[0]}</span>
+                        </div>
+                      ) : (
+                        <span className="text-neutral-500 font-medium">{task.dri_name || 'Unassigned'}</span>
+                      )}
+                    </td>
                   </tr>
                 ))}
               </tbody>

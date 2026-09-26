@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from 'next/server'
+import { createServerClient } from '@supabase/ssr'
 
 export async function middleware(request: NextRequest) {
   // ─── Dev bypass ───────────────────────────────────────────────
@@ -13,7 +14,6 @@ export async function middleware(request: NextRequest) {
   }
 
   // ─── Production auth (Supabase session refresh) ───────────────
-  const { createServerClient } = await import('@supabase/ssr')
 
   let supabaseResponse = NextResponse.next({ request })
 
@@ -50,13 +50,22 @@ export async function middleware(request: NextRequest) {
   if (!user && !isPublicPath) {
     const url = request.nextUrl.clone()
     url.pathname = '/login'
-    return NextResponse.redirect(url)
+    const redirectResponse = NextResponse.redirect(url)
+    // Copy cookies from supabaseResponse to redirectResponse
+    supabaseResponse.cookies.getAll().forEach((cookie) => {
+      redirectResponse.cookies.set(cookie.name, cookie.value)
+    })
+    return redirectResponse
   }
 
   if (user && pathname === '/login') {
     const url = request.nextUrl.clone()
     url.pathname = '/'
-    return NextResponse.redirect(url)
+    const redirectResponse = NextResponse.redirect(url)
+    supabaseResponse.cookies.getAll().forEach((cookie) => {
+      redirectResponse.cookies.set(cookie.name, cookie.value)
+    })
+    return redirectResponse
   }
 
   return supabaseResponse

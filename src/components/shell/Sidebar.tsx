@@ -60,12 +60,6 @@ const NAV_GROUPS = [
   },
   
   {
-    label: 'Workspace',
-    items: [
-      { href: '/brainstorming', label: 'Brainstorming', icon: Lightbulb },
-    ],
-  },
-  {
     label: 'Reports',
     items: [
       { href: '/analytics', label: 'Analytics', icon: BarChart2 },
@@ -74,6 +68,7 @@ const NAV_GROUPS = [
   {
     label: 'Workspace',
     items: [
+      { href: '/brainstorming', label: 'Brainstorming', icon: Lightbulb },
       { href: '/settings', label: 'Settings', icon: Settings },
     ],
   },

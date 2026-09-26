@@ -1,3 +1,5 @@
+import { Avatar } from "@/components/ui/Avatar";
+
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import React from 'react';
 import { AlignLeft, Clock, CheckSquare } from 'lucide-react';
@@ -86,8 +88,9 @@ export function TasksKanban({ tasks, onStatusChange, onCardClick }: {
                     </div>
 
                     {task.users?.full_name && (
-                      <div className="flex items-center gap-1 text-[10px] text-neutral-500 bg-neutral-50 border border-neutral-100 rounded px-1.5 py-0.5 w-fit">
-                        <span className="font-semibold">{task.users.full_name}</span>
+                      <div className="flex items-center gap-1.5 text-[11px] text-neutral-600 bg-neutral-50 border border-neutral-100 rounded-full pr-2 w-fit overflow-hidden">
+                        <Avatar name={task.users.full_name} url={task.users.avatar_url} size="sm" />
+                        <span className="font-medium whitespace-nowrap">{task.users.full_name.split(' ')[0]}</span>
                       </div>
                     )}
                     <div className="flex flex-wrap items-center gap-3 text-xs text-neutral-400">

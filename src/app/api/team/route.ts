@@ -25,7 +25,7 @@ export async function GET() {
     const ctx = await authorize()
     if ('error' in ctx) return ctx.error
     const { admin, me } = ctx
-    const { data, error } = await admin.from('users').select('id, full_name, email, role, created_at').order('created_at')
+    const { data, error } = await admin.from('users').select('id, full_name, email, role, avatar_url, created_at').order('created_at')
     if (error) throw error
     const logins = await authUserIds(admin)
     const members = (data as (Member & { created_at: string })[]).map(m => ({

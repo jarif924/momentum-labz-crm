@@ -1,0 +1,36 @@
+name: Nightly Database Backup
+
+on:
+  schedule:
+    - cron: '0 2 * * *' # Runs at 02:00 UTC every day
+  workflow_dispatch: # Allows manual trigger
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install PostgreSQL client
+        run: sudo apt-get install -y postgresql-client
+
+      - name: Create Backup Directory
+        run: mkdir -p backups
+
+      - name: Run pg_dump
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          TIMESTAMP=$(date +"%Y-%m-%d_%H-%M-%S")
+          FILENAME="backups/momentum_crm_backup_${TIMESTAMP}.sql"
+          echo "Dumping database to ${FILENAME}..."
+          pg_dump "${DATABASE_URL}" -F c -f "${FILENAME}"
+          echo "BACKUP_FILE=${FILENAME}" >> $GITHUB_ENV
+
+      - name: Upload Backup as Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: db-backup-${{ github.run_id }}
+          path: backups/*.sql
+          retention-days: 30

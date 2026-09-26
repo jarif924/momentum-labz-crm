@@ -4,7 +4,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import { createBrowserClient } from '@supabase/ssr'
 import { Database } from '@/types/supabase'
-import { TrendingUp, Users, Target, Clock } from 'lucide-react'
+import { TrendingUp, Users, Target, Clock, Globe, PieChart } from 'lucide-react'
 
 function StatCard({ label, value, sub, icon: Icon, accent }: any) {
   return (
@@ -48,7 +48,7 @@ export default function AnalyticsPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  const { stats, sourceData, funnelData, lostReasonsData } = useMemo(() => {
+  const { stats, services, sourceData, funnelData, lostReasonsData } = useMemo(() => {
     const total = leads.length
     let won = 0, lost = 0, active = 0
     let totalVelocityDays = 0
@@ -62,6 +62,10 @@ export default function AnalyticsPage() {
 
     // Lost Reasons tracking
     const lostReasons: Record<string, number> = {}
+
+    let bd = 0;
+    let intl = 0;
+    const services: Record<string, number> = { 'tech_solutions': 0, 'web_development': 0, 'marketing': 0 };
 
     leads.forEach((l: any) => {
       // Funnel
@@ -77,6 +81,11 @@ export default function AnalyticsPage() {
       const s = l.utm_source || l.source || 'direct'
       if (!sources[s]) sources[s] = { total: 0, won: 0 }
       sources[s].total++
+
+      if (l.region === 'bangladesh') bd++;
+      if (l.region === 'international') intl++;
+      
+      if (l.service_line && services[l.service_line] !== undefined) services[l.service_line]++;
 
       // Stage logic
       const isWon = stages.find(st => st.name === l.stage)?.is_won
@@ -107,7 +116,8 @@ export default function AnalyticsPage() {
     })).sort((a, b) => b.total - a.total).slice(0, 5) // Top 5 sources
 
     return {
-      stats: { total, won, lost, active, winRate, avgVelocity },
+      stats: { total, won, lost, active, winRate, avgVelocity, bd, intl },
+      services,
       sourceData: sData,
       funnelData: stages.map((s: any) => ({ name: s.name, count: funnel[s.name] || 0 })),
       lostReasonsData: Object.entries(lostReasons).map(([name, count]) => ({ name, count })).sort((a, b) => b.count - a.count)
@@ -235,6 +245,53 @@ export default function AnalyticsPage() {
                   })}
                 </div>
               )}
+            </div>
+          </div>
+        </div>
+
+        {/* Region Split and Service Lines */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
+          <div className="bg-neutral-0 border border-neutral-100 rounded-[16px] p-6 flex flex-col justify-center">
+            <div className="flex items-center gap-2 mb-4">
+              <Globe size={18} className="text-neutral-400" />
+              <h2 className="text-base font-semibold text-neutral-900">Region Split</h2>
+            </div>
+            <div className="flex flex-col gap-3">
+              <div>
+                <div className="flex justify-between text-sm mb-1">
+                  <span className="text-neutral-600">Bangladesh</span>
+                  <span className="font-semibold">{stats.bd}</span>
+                </div>
+                <div className="w-full h-2 bg-neutral-100 rounded-full overflow-hidden">
+                  <div className="h-full bg-accent-500" style={{ width: `${stats.total ? (stats.bd/stats.total)*100 : 0}%`}}></div>
+                </div>
+              </div>
+              <div>
+                <div className="flex justify-between text-sm mb-1">
+                  <span className="text-neutral-600">International</span>
+                  <span className="font-semibold">{stats.intl}</span>
+                </div>
+                <div className="w-full h-2 bg-neutral-100 rounded-full overflow-hidden">
+                  <div className="h-full bg-neutral-800" style={{ width: `${stats.total ? (stats.intl/stats.total)*100 : 0}%`}}></div>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          <div className="bg-neutral-0 border border-neutral-100 rounded-[16px] p-6 flex flex-col justify-center">
+            <div className="flex items-center gap-2 mb-4">
+              <PieChart size={18} className="text-neutral-400" />
+              <h2 className="text-base font-semibold text-neutral-900">Service Lines</h2>
+            </div>
+            <div className="space-y-3">
+              {Object.entries(services).map(([service, count]) => (
+                <div key={service}>
+                  <div className="flex justify-between text-sm mb-1">
+                    <span className="text-neutral-600 capitalize">{service.split('_').join(' ')}</span>
+                    <span className="font-semibold">{count as number}</span>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         </div>

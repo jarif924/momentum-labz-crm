@@ -5,7 +5,7 @@ import { createClient as createServerClient } from '@/lib/supabase/server'
 
 export const ROLES = ['owner', 'admin', 'sales', 'viewer'] as const
 export type Role = (typeof ROLES)[number]
-export type Member = { id: string; full_name: string; email: string; role: Role }
+export type Member = { id: string; full_name: string; email: string; role: Role; avatar_url?: string | null }
 
 export const canManageTeam = (role?: string | null) => role === 'owner' || role === 'admin'
 
@@ -58,7 +58,7 @@ export async function bootstrapOwner(admin: SupabaseClient) {
 }
 
 export async function getMember(admin: SupabaseClient, id: string): Promise<Member | null> {
-  const { data } = await admin.from('users').select('id, full_name, email, role').eq('id', id).maybeSingle()
+  const { data } = await admin.from('users').select('id, full_name, email, role, avatar_url').eq('id', id).maybeSingle()
   return (data as Member | null) ?? null
 }
 

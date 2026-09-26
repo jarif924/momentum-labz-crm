@@ -160,7 +160,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: { 
   };
 
   const renderCurrencies = (record: Record<string, number>) => {
-    const entries = Object.entries(record).filter(([_, v]) => v > 0);
+    const entries = Object.entries(record).filter(([, v]) => v > 0);
     if (entries.length === 0) return <div className="text-2xl font-semibold text-neutral-900">{formatCurrency(0, 'BDT')}</div>;
     return entries.map(([cur, val]) => (
       <div key={cur} className="text-2xl font-semibold text-neutral-900 leading-tight">{formatCurrency(val, cur)}</div>

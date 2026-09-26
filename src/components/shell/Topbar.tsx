@@ -1,6 +1,9 @@
+
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 'use client'
+import { Avatar } from "@/components/ui/Avatar"
+
 
 import { useState, useEffect } from 'react'
 import { Search, Bell, ChevronDown, LogOut, User, Settings, ArrowRight } from 'lucide-react'
@@ -13,7 +16,7 @@ import { friendlyError } from '@/lib/errors'
 const ROLE_LABELS: Record<string, string> = { owner: 'Owner', admin: 'Admin', sales: 'Sales', viewer: 'Viewer' }
 
 export function Topbar() {
-  const [profile, setProfile] = useState<{ full_name: string; role: string | null } | null>(null)
+  const [profile, setProfile] = useState<{ full_name: string; role: string | null; avatar_url?: string | null } | null>(null)
 
   // Signed-in person's name and role; refreshed when they rename themselves in My account
   useEffect(() => {
@@ -25,7 +28,7 @@ export function Topbar() {
     window.addEventListener('profile-updated', load)
     return () => window.removeEventListener('profile-updated', load)
   }, [])
-  const profileInitials = (profile?.full_name ?? '').split(/\s+/).filter(Boolean).slice(0, 2).map(p => p[0]!.toUpperCase()).join('')
+  
 
   const [profileOpen, setProfileOpen] = useState(false)
   const [notifOpen, setNotifOpen] = useState(false)
@@ -164,9 +167,7 @@ export function Topbar() {
             onClick={() => setProfileOpen(!profileOpen)}
             className="flex items-center gap-2 h-10 px-2 rounded-md hover:bg-neutral-50 transition-colors"
           >
-            <div className="w-8 h-8 rounded-full bg-neutral-100 flex items-center justify-center shrink-0">
-              <span className="text-[10px] text-neutral-600 font-bold tracking-wider">{profileInitials}</span>
-            </div>
+            <Avatar name={profile?.full_name ?? ''} url={profile?.avatar_url} size="md" />
             <div className="hidden sm:block text-left">
               <p className="text-[13px] font-medium text-neutral-900 leading-none">{profile?.full_name ?? ''}</p>
               <p className="text-[11px] text-neutral-400 mt-0.5">{profile ? ROLE_LABELS[profile.role ?? ''] ?? 'Not on team' : ''}</p>

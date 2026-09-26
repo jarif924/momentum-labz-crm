@@ -1,98 +1,107 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { Client } from 'pg'
 import Image from 'next/image'
 import { notFound } from 'next/navigation'
 import { CheckCircle2, Clock, ExternalLink, Calendar, Video, CreditCard, TrendingUp, Users, DollarSign } from 'lucide-react'
 import { PortalTaskApproveButton } from '@/components/portal/PortalTaskApproveButton'
+import { createAdminClient } from '@/lib/supabase/admin'
 
 export const revalidate = 0 // always fetch fresh data for the portal
+export const runtime = 'edge';
 
 export default async function ClientPortalPage({ params }: { params: { id: string } }) {
-  let dbClient: Client | null = null;
   let project: any = null;
   let tasks: any[] = [];
   
   try {
-    dbClient = new Client({
-      connectionString: process.env.DATABASE_URL
-    });
-    await dbClient.connect();
+    const admin = createAdminClient();
 
-    const projectRes = await dbClient.query(`
-      SELECT p.id, p.name, p.status, p.target_date, p.total_ad_spend, p.leads_generated, p.cpl, 
-             p.roas, p.staging_url, p.production_url, p.repository_url, p.currency,
-             c.name as company_name, lc.full_name as client_name, l.currency as lead_currency
-      FROM projects p
-      LEFT JOIN companies c ON p.company_id = c.id
-      LEFT JOIN leads l ON p.lead_id = l.id
-      LEFT JOIN contacts lc ON l.contact_id = lc.id
-      WHERE p.id = $1
-    `, [params.id]);
+    const { data: proj, error: projErr } = await admin
+      .from('projects')
+      .select(`
+        id, name, status, target_date, total_ad_spend, leads_generated, cpl,
+        roas, staging_url, production_url, repository_url, currency,
+        company:companies ( name ),
+        lead:leads ( currency, contact:contacts ( full_name ) )
+      `)
+      .eq('id', params.id)
+      .single();
 
-    if (projectRes.rows.length === 0) {
+    if (projErr || !proj) {
+      console.error('Project not found:', projErr);
       return notFound();
     }
-    project = projectRes.rows[0];
-    if (!project.currency) project.currency = project.lead_currency; // fallback
 
-    const tasksRes = await dbClient.query(`
-      SELECT id, title, description, completed, loom_url, requires_client_approval 
-      FROM tasks 
-      WHERE project_id = $1 AND is_client_visible = true 
-      ORDER BY sort_order ASC, created_at ASC
-    `, [params.id]);
-    
-    tasks = tasksRes.rows;
+    project = {
+      ...proj,
+      company_name: Array.isArray(proj.company) ? proj.company[0]?.name : proj.company?.name,
+      client_name: Array.isArray(proj.lead?.contact) ? proj.lead?.contact[0]?.full_name : proj.lead?.contact?.full_name,
+      lead_currency: proj.lead?.currency,
+      est_roi_value: (proj.leads_generated || 0) * 1500
+    };
 
-  } catch (error) {
-    console.error('Failed to load portal:', error);
-    return <div className="min-h-screen flex items-center justify-center text-error-600">Failed to load project portal.</div>;
-  } finally {
-    if (dbClient) await dbClient.end();
+    const { data: tsks, error: taskErr } = await admin
+      .from('tasks')
+      .select('id, title, description, loom_url, status, needs_client_approval, created_at')
+      .eq('project_id', params.id)
+      .eq('is_client_visible', true)
+      .order('created_at', { ascending: false });
+
+    if (taskErr) throw taskErr;
+
+    tasks = (tsks || []).map((t: any) => ({
+      id: t.id,
+      title: t.title,
+      description: t.description,
+      loom_url: t.loom_url,
+      completed: t.status === 'completed',
+      requires_client_approval: t.needs_client_approval
+    }));
+
+  } catch (err: unknown) {
+    console.error('Portal load error:', err);
+    return notFound();
   }
 
-  const clientName = project.company_name || project.client_name || 'Client';
-
   return (
-    <div className="min-h-screen bg-[#FDFDFD] text-neutral-900 font-sans selection:bg-accent-100 selection:text-accent-900">
-      <header className="border-b border-neutral-100 bg-white">
-        <div className="max-w-4xl mx-auto px-6 h-20 flex items-center justify-between">
-          <Image
-            src="/logo.png"
-            alt="Momentum Labz"
-            width={160}
-            height={36}
-            style={{ height: '36px', width: 'auto' }}
-            priority
-          />
-          <div className="flex flex-col items-end">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-neutral-400">Client Portal</span>
-            <span className="text-sm font-semibold text-neutral-800">{clientName}</span>
+    <div className="min-h-screen bg-[#F8FAFC]">
+      <header className="bg-white border-b border-neutral-200">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-5 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 bg-neutral-900 rounded-lg flex items-center justify-center">
+              <span className="text-white font-bold tracking-tighter text-sm">ML</span>
+            </div>
+            <div>
+              <h1 className="text-sm font-semibold text-neutral-900">Momentum Labz</h1>
+              <p className="text-xs text-neutral-500">Client Portal</p>
+            </div>
+          </div>
+          <div className="text-right">
+            <p className="text-sm font-medium text-neutral-900">{project.client_name || 'Client'}</p>
+            <p className="text-xs text-neutral-500">{project.company_name || 'Project Overview'}</p>
           </div>
         </div>
       </header>
 
-      <main className="max-w-4xl mx-auto px-6 py-12">
-        <div className="mb-12">
-          <h1 className="text-3xl font-semibold tracking-tight text-neutral-900 mb-2">{project.name}</h1>
-          <div className="flex flex-wrap gap-4 items-center text-sm text-neutral-500">
-            <span className="flex items-center gap-1.5 px-3 py-1 bg-neutral-50 rounded-full border border-neutral-200">
-              <span className="w-2 h-2 rounded-full bg-accent-500"></span>
-              Status: <strong className="text-neutral-900 capitalize">{project.status}</strong>
+      <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+        <div className="mb-10">
+          <div className="flex items-center gap-3 mb-2">
+            <h1 className="text-3xl font-bold tracking-tight text-neutral-900">{project.name}</h1>
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-neutral-100 text-neutral-700 text-xs font-medium border border-neutral-200">
+              <span className="w-1.5 h-1.5 rounded-full bg-success-500"></span> Live
             </span>
-            {project.target_date && (
-              <span className="flex items-center gap-1.5 px-3 py-1 bg-neutral-50 rounded-full border border-neutral-200">
-                <Calendar size={14} />
-                Target: <strong className="text-neutral-900">{new Date(project.target_date).toLocaleDateString()}</strong>
-              </span>
-            )}
           </div>
+          <p className="text-neutral-500">
+            {project.target_date ? (
+              <span className="flex items-center gap-1.5">
+                <Calendar size={16} /> Target completion: {new Date(project.target_date).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+              </span>
+            ) : 'Welcome to your active project portal.'}
+          </p>
         </div>
 
-        
-        {/* The "Dead-Simple ROI" Widget */}
+        {/* Marketing / ROI Widget */}
         {(project.total_ad_spend > 0 || project.leads_generated > 0) && (
-          <div className="mb-12 bg-gradient-to-br from-neutral-900 to-neutral-800 rounded-[16px] p-6 text-white shadow-xl relative overflow-hidden">
+          <div className="mb-12 bg-neutral-900 rounded-[20px] p-8 text-white relative overflow-hidden">
             <div className="absolute top-0 right-0 p-8 opacity-10"><TrendingUp size={120} /></div>
             <div className="relative z-10">
               <h2 className="text-lg font-semibold text-white/90 flex items-center gap-2 mb-6">
@@ -172,7 +181,6 @@ export default async function ClientPortalPage({ params }: { params: { id: strin
                 {tasks.map((task) => {
                   return (
                     <div key={task.id} className="relative pl-8">
-                      {/* Timeline dot */}
                       <div className={`absolute -left-[11px] top-1 w-5 h-5 rounded-full border-[3px] border-white flex items-center justify-center ${task.completed ? 'bg-success-500' : 'bg-neutral-200'}`}>
                         {task.completed && <CheckCircle2 size={12} className="text-white absolute" />}
                       </div>

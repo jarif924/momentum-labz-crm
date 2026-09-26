@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { Client } from 'pg';
+import { createAdminClient } from '@/lib/supabase/admin';
+
+export const runtime = 'edge';
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
@@ -12,7 +14,6 @@ export async function OPTIONS() {
 }
 
 export async function POST(req: NextRequest) {
-  let dbClient: Client | null = null;
   try {
     // 1. API Key Validation
     const apiKey = req.headers.get('x-crm-api-key');
@@ -30,23 +31,20 @@ export async function POST(req: NextRequest) {
     if (!contactData || !contactData.full_name || !contactData.email) {
       return NextResponse.json({ success: false, error: 'Missing required contact fields' }, { status: 400, headers: CORS_HEADERS });
     }
-    // project_details is optional — website contact forms may not include service/budget
+    
     const safeProjectData = projectData || {};
-
-    dbClient = new Client({
-      connectionString: process.env.DATABASE_URL
-    });
-    await dbClient.connect();
+    const admin = createAdminClient();
 
     // 3. Deduplication Check
     const sixtySecondsAgo = new Date(Date.now() - 60000).toISOString();
-    const contactRes = await dbClient.query('SELECT id FROM contacts WHERE email = $1 LIMIT 1', [contactData.email]);
     
-    if (contactRes.rows.length > 0) {
-      const contactId = contactRes.rows[0].id;
-      const recentLeads = await dbClient.query('SELECT id FROM leads WHERE contact_id = $1 AND created_at >= $2 LIMIT 1', [contactId, sixtySecondsAgo]);
-      if (recentLeads.rows.length > 0) {
-        await dbClient.end();
+    let contactId = null;
+    const { data: contactMatches } = await admin.from('contacts').select('id').eq('email', contactData.email).limit(1);
+    
+    if (contactMatches && contactMatches.length > 0) {
+      contactId = contactMatches[0].id;
+      const { data: recentLeads } = await admin.from('leads').select('id').eq('contact_id', contactId).gte('created_at', sixtySecondsAgo).limit(1);
+      if (recentLeads && recentLeads.length > 0) {
         return NextResponse.json({ success: true, status: 'duplicate_suppressed' }, { status: 200, headers: CORS_HEADERS });
       }
     }
@@ -54,32 +52,33 @@ export async function POST(req: NextRequest) {
     // 4. Upsert Company
     let companyId = null;
     if (contactData.company_name) {
-      const compRes = await dbClient.query('SELECT id FROM companies WHERE name = $1 LIMIT 1', [contactData.company_name]);
-      if (compRes.rows.length > 0) {
-        companyId = compRes.rows[0].id;
+      const { data: compMatches } = await admin.from('companies').select('id').eq('name', contactData.company_name).limit(1);
+      if (compMatches && compMatches.length > 0) {
+        companyId = compMatches[0].id;
       } else {
-        const newComp = await dbClient.query(
-          'INSERT INTO companies (name, website) VALUES ($1, $2) RETURNING id',
-          [contactData.company_name, contactData.website_url || null]
-        );
-        companyId = newComp.rows[0].id;
+        const { data: newComp } = await admin.from('companies').insert({
+          name: contactData.company_name,
+          website: contactData.website_url || null
+        }).select('id').single();
+        if (newComp) companyId = newComp.id;
       }
     }
 
     // 5. Upsert Contact
-    let contactId = null;
-    if (contactRes.rows.length > 0) {
-      contactId = contactRes.rows[0].id;
-      await dbClient.query(
-        'UPDATE contacts SET full_name = $1, phone = $2, company_id = $3 WHERE id = $4',
-        [contactData.full_name, contactData.phone || null, companyId, contactId]
-      );
+    if (contactId) {
+      await admin.from('contacts').update({
+        full_name: contactData.full_name,
+        phone: contactData.phone || null,
+        company_id: companyId
+      }).eq('id', contactId);
     } else {
-      const newContact = await dbClient.query(
-        'INSERT INTO contacts (full_name, email, phone, company_id) VALUES ($1, $2, $3, $4) RETURNING id',
-        [contactData.full_name, contactData.email, contactData.phone || null, companyId]
-      );
-      contactId = newContact.rows[0].id;
+      const { data: newContact } = await admin.from('contacts').insert({
+        full_name: contactData.full_name,
+        email: contactData.email,
+        phone: contactData.phone || null,
+        company_id: companyId
+      }).select('id').single();
+      if (newContact) contactId = newContact.id;
     }
 
     // 6. Lead Scoring
@@ -107,24 +106,34 @@ export async function POST(req: NextRequest) {
     const region = 'international';
 
     // 8. Create Lead
-    const leadRes = await dbClient.query(`
-      INSERT INTO leads (
-        contact_id, company_id, services, service_line, region, source, stage, 
-        lead_score, budget_tier, timeline, landing_page, submission_url, raw_payload, 
-        utm_source, utm_medium, utm_campaign, utm_content, utm_term, 
-        gclid, fbclid, ttclid, referrer_url, client_ip
-      ) VALUES (
-        $1, $2, $3, $4, $5, $6, $7, 
-        $8, $9, $10, $11, $12, $13, 
-        $14, $15, $16, $17, $18, 
-        $19, $20, $21, $22, $23
-      ) RETURNING id`, [
-      contactId, companyId, [si], serviceLine, region, 'inbound_form', 'Prospect Found',
-      score, bt, tm || null, attrData?.landing_page || null, attrData?.submission_url || null, JSON.stringify(payload),
-      attrData?.utm_source || null, attrData?.utm_medium || null, attrData?.utm_campaign || null, attrData?.utm_content || null, attrData?.utm_term || null,
-      attrData?.gclid || null, attrData?.fbclid || null, attrData?.ttclid || null, attrData?.referrer_url || null, attrData?.client_ip || null
-    ]);
-    const leadId = leadRes.rows[0].id;
+    const { data: newLead, error: leadError } = await admin.from('leads').insert({
+      contact_id: contactId,
+      company_id: companyId,
+      services: [si],
+      service_line: serviceLine,
+      region: region,
+      source: 'inbound_form',
+      stage: 'Prospect Found',
+      lead_score: score,
+      budget_tier: bt,
+      timeline: tm || null,
+      landing_page: attrData?.landing_page || null,
+      submission_url: attrData?.submission_url || null,
+      raw_payload: payload,
+      utm_source: attrData?.utm_source || null,
+      utm_medium: attrData?.utm_medium || null,
+      utm_campaign: attrData?.utm_campaign || null,
+      utm_content: attrData?.utm_content || null,
+      utm_term: attrData?.utm_term || null,
+      gclid: attrData?.gclid || null,
+      fbclid: attrData?.fbclid || null,
+      ttclid: attrData?.ttclid || null,
+      referrer_url: attrData?.referrer_url || null,
+      client_ip: attrData?.client_ip || null
+    }).select('id').single();
+
+    if (leadError || !newLead) throw leadError || new Error('Failed to create lead');
+    const leadId = newLead.id;
 
     // 9. Auto-Tagging
     let tagString = '';
@@ -132,19 +141,19 @@ export async function POST(req: NextRequest) {
     else if (score >= 40) tagString = 'STANDARD_LEAD';
     else tagString = 'LOW_INTENT_OR_DOWNSELL';
 
-    const tagRes = await dbClient.query('SELECT id FROM tags WHERE name = $1 LIMIT 1', [tagString]);
     let tagId = null;
-    if (tagRes.rows.length > 0) {
-      tagId = tagRes.rows[0].id;
+    const { data: tagMatches } = await admin.from('tags').select('id').eq('name', tagString).limit(1);
+    
+    if (tagMatches && tagMatches.length > 0) {
+      tagId = tagMatches[0].id;
     } else {
-      // No color column in tags table
-      const newTag = await dbClient.query('INSERT INTO tags (name) VALUES ($1) RETURNING id', [tagString]);
-      tagId = newTag.rows[0].id;
+      const { data: newTag } = await admin.from('tags').insert({ name: tagString }).select('id').single();
+      if (newTag) tagId = newTag.id;
     }
     
-    await dbClient.query('INSERT INTO lead_tags (lead_id, tag_id) VALUES ($1, $2)', [leadId, tagId]);
-
-    await dbClient.end();
+    if (tagId) {
+      await admin.from('lead_tags').insert({ lead_id: leadId, tag_id: tagId });
+    }
 
     // 10. Notification Stub
     if (tagString === 'PRIORITY_LEAD') {
@@ -159,9 +168,6 @@ export async function POST(req: NextRequest) {
 
   } catch (err: unknown) {
     console.error('Ingest error:', err);
-    if (dbClient) {
-      try { await dbClient.end(); } catch {}
-    }
     return NextResponse.json({ success: false, error: 'Internal Server Error' }, { status: 500, headers: CORS_HEADERS });
   }
 }

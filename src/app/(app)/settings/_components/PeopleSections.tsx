@@ -8,8 +8,8 @@ import { useToast } from '@/components/ui/Toast'
 import { Card, ConfirmDialog, EmptyState, IconButton, LoadError, Notice, SectionHeader, Skeleton, useSupabase } from './ui'
 
 type Role = 'owner' | 'admin' | 'sales' | 'viewer'
-type Member = { id: string; full_name: string; email: string; role: Role; has_login: boolean; last_sign_in_at: string | null }
-type Me = { id: string; full_name: string; email: string; role: Role } | null
+type Member = { id: string; full_name: string; email: string; role: Role; has_login: boolean; last_sign_in_at: string | null; avatar_url?: string | null }
+type Me = { id: string; full_name: string; email: string; role: Role; avatar_url?: string | null } | null
 
 const ROLE_INFO: Record<Role, { label: string; hint: string }> = {
   owner: { label: 'Owner', hint: 'Full control, including other owners' },
@@ -27,12 +27,12 @@ async function api<T>(url: string, init?: RequestInit): Promise<T> {
   return body as T
 }
 
-const initials = (name: string) => name.split(/\s+/).filter(Boolean).slice(0, 2).map(p => p[0]!.toUpperCase()).join('') || '?'
 const since = (iso: string | null) => (iso ? `Last signed in ${new Date(iso).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}` : 'Has not signed in yet')
 
-function Avatar({ name }: { name: string }) {
-  return <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-neutral-100 text-body-medium text-neutral-600">{initials(name)}</span>
-}
+
+
+import { Avatar } from '@/components/ui/Avatar'
+import { AvatarUploader } from '@/components/ui/AvatarUploader'
 
 function PasswordReveal({ open, name, email, password, onClose }: { open: boolean; name: string; email: string; password: string; onClose: () => void }) {
   const [copied, setCopied] = useState(false)
@@ -190,7 +190,7 @@ export function TeamSection() {
               const ownerLocked = m.role === 'owner' && me?.role !== 'owner'
               return (
                 <li key={m.id} className="flex flex-wrap items-center gap-3 px-4 py-3 sm:flex-nowrap sm:px-6">
-                  <Avatar name={m.full_name} />
+                  <Avatar name={m.full_name} url={m.avatar_url} />
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-body-medium text-neutral-900">
                       {m.full_name}{isMe && <span className="ml-2 inline-flex h-[22px] items-center rounded-sm bg-neutral-100 px-2 align-middle text-micro text-neutral-600">You</span>}
@@ -252,8 +252,9 @@ export function TeamSection() {
 export function AccountSection() {
   const toast = useToast()
   const supabase = useSupabase()
-  const [me, setMe] = useState<{ full_name: string; email: string; role: Role | null } | null>(null)
+  const [me, setMe] = useState<{ full_name: string; email: string; role: Role | null; avatar_url?: string | null } | null>(null)
   const [name, setName] = useState('')
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [savingName, setSavingName] = useState(false)
   const [pw, setPw] = useState({ next: '', confirm: '' })
@@ -262,14 +263,27 @@ export function AccountSection() {
   const load = useCallback(async () => {
     setLoadError(null)
     try {
-      const data = await api<{ full_name: string; email: string; role: Role | null }>('/api/team/me')
+      const data = await api<{ full_name: string; email: string; role: Role | null; avatar_url?: string | null }>('/api/team/me')
       setMe(data)
       setName(data.full_name)
+      setAvatarUrl(data.avatar_url ?? null)
     } catch (e) {
       setLoadError((e as Error).message)
     }
   }, [])
   useEffect(() => { load() }, [load])
+
+  async function handleAvatarUpload(url: string | null) {
+    try {
+      const res = await api<{ avatar_url: string | null }>('/api/team/me', { method: 'PATCH', body: JSON.stringify({ avatar_url: url }) })
+      setMe(m => (m ? { ...m, avatar_url: res.avatar_url } : m))
+      setAvatarUrl(res.avatar_url)
+      toast.success(url ? 'Profile photo updated' : 'Profile photo removed')
+      window.dispatchEvent(new Event('profile-updated'))
+    } catch (e) {
+      toast.error((e as Error).message)
+    }
+  }
 
   async function saveName() {
     setSavingName(true)
@@ -300,11 +314,14 @@ export function AccountSection() {
 
   return (
     <div className="flex flex-col gap-6">
-      <SectionHeader title="My account" description="Your name as shown to the team, and your password." />
+      <SectionHeader title="My account" description="Your name and photo as shown to the team, and your password." />
       <Card
         title="Profile"
         footer={<Button onClick={saveName} disabled={savingName || name.trim() === me.full_name || name.trim().length < 2}>{savingName ? 'Saving…' : 'Save name'}</Button>}
       >
+        <div className="mb-6">
+          <AvatarUploader url={avatarUrl} name={name} onUpload={handleAvatarUpload} />
+        </div>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Input label="Full name" value={name} onChange={e => setName(e.target.value)} />
           <Input label="Email" value={me.email} disabled />
