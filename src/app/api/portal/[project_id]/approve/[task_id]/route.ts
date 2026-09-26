@@ -14,8 +14,9 @@ export async function POST(
     await dbClient.connect();
 
     // Verify the task belongs to the project and requires approval
+    // Clients may only approve tasks they can see in the portal
     const checkRes = await dbClient.query(
-      'SELECT id, requires_client_approval FROM tasks WHERE id = $1 AND project_id = $2',
+      'SELECT id, requires_client_approval FROM tasks WHERE id = $1 AND project_id = $2 AND is_client_visible = true',
       [params.task_id, params.project_id]
     );
 
@@ -27,10 +28,10 @@ export async function POST(
       return NextResponse.json({ error: 'Task does not require approval' }, { status: 400 });
     }
 
-    // Update the task to completed
+    // 'Done' must match the Tasks board column name exactly
     await dbClient.query(
       'UPDATE tasks SET completed = true, status = $1 WHERE id = $2',
-      ['done', params.task_id]
+      ['Done', params.task_id]
     );
 
     return NextResponse.json({ success: true });
