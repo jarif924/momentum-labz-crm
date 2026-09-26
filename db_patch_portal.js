@@ -1,7 +1,7 @@
 const { Client } = require('pg');
 
 async function migrate() {
-  const client = new Client({ connectionString: "postgresql://postgres.mjvpdvopcxpthultrjpf:kirekikhbr%40%40%24%24924@aws-0-ap-south-1.pooler.supabase.com:6543/postgres" });
+  const client = new Client({ connectionString: process.env.DATABASE_URL });
   await client.connect();
   
   try {

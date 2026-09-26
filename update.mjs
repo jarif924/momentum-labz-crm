@@ -2,7 +2,7 @@ import pg from 'pg';
 
 const { Client } = pg;
 
-const connectionString = 'postgresql://postgres:kirekikhbr%40%40%24%24924@db.mjvpdvopcxpthultrjpf.supabase.co:5432/postgres';
+const connectionString = process.env.DATABASE_URL;
 
 const client = new Client({
   connectionString,
