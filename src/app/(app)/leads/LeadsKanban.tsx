@@ -1,12 +1,16 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export function LeadsKanban({ leads, stages, onStageChange, onCardClick }: { leads: any[], stages: any[], onStageChange: (leadId: string, newStage: string) => void, onCardClick: (l: any) => void }) {
-  
+export function LeadsKanban({ leads, stages, onStageChange, onCardClick, fxRates, fxUpdatedAt }: { leads: any[], stages: any[], onStageChange: (leadId: string, newStage: string) => void, onCardClick: (l: any) => void, fxRates?: Record<string, number>, fxUpdatedAt?: string | null }) {
+
+  // Rates come from Settings > Currency & FX (Taka per 1 unit)
   const getBdtValue = (amount: number, currency: string) => {
-    const rates: Record<string, number> = { 'USD': 120, 'AUD': 80, 'EUR': 130, 'BDT': 1 };
-    return (amount || 0) * (rates[currency || 'BDT'] || 1);
+    const rates: Record<string, number> = { ...(fxRates ?? {}), BDT: 1 };
+    return (amount || 0) * (rates[currency || 'BDT'] ?? 0);
   };
+  const ratesNote = fxUpdatedAt
+    ? `Taka totals use exchange rates from Settings, updated ${new Date(fxUpdatedAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}`
+    : 'Taka totals use exchange rates from Settings';
 
   const handleDragStart = (e: React.DragEvent, leadId: string) => {
     e.dataTransfer.setData('leadId', leadId);
@@ -25,7 +29,9 @@ export function LeadsKanban({ leads, stages, onStageChange, onCardClick }: { lea
   };
 
   return (
-    <div className="flex gap-4 overflow-x-auto pb-4 h-[calc(100vh-200px)]">
+    <>
+    <p className="mb-2 text-small text-neutral-500">{ratesNote}</p>
+    <div className="flex gap-4 overflow-x-auto pb-4 h-[calc(100vh-220px)]">
       {stages.map(stage => {
         const stageLeads = leads.filter(l => l.stage === stage.name);
         
@@ -40,8 +46,8 @@ export function LeadsKanban({ leads, stages, onStageChange, onCardClick }: { lea
               
               <div className="flex flex-col">
                 <h3 className="text-sm font-medium text-neutral-900">{stage.name}</h3>
-                <span className="text-[10px] text-neutral-500 font-medium mt-0.5">
-                  ৳ {stageLeads.reduce((acc, l) => acc + getBdtValue(l.deal_value, l.currency), 0).toLocaleString()}
+                <span className="text-[10px] text-neutral-500 font-medium mt-0.5" title={ratesNote}>
+                  ৳ {Math.round(stageLeads.reduce((acc, l) => acc + getBdtValue(l.deal_value, l.currency), 0)).toLocaleString()}
                 </span>
               </div>
 
@@ -77,5 +83,6 @@ export function LeadsKanban({ leads, stages, onStageChange, onCardClick }: { lea
         );
       })}
     </div>
+    </>
   );
 }

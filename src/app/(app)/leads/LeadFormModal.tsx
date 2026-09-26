@@ -42,6 +42,7 @@ export function LeadFormModal({ isOpen, onClose, lead, onSave }: { isOpen: boole
   const [customFieldsSchema, setCustomFieldsSchema] = useState<any[]>([]);
   const [availableTags, setAvailableTags] = useState<any[]>([]);
   const [leadSources, setLeadSources] = useState<{ id: string; label: string }[]>([]);
+  const [currencyMapping, setCurrencyMapping] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
   const toast = useToast();
 
@@ -99,7 +100,7 @@ export function LeadFormModal({ isOpen, onClose, lead, onSave }: { isOpen: boole
       supabase.from('contacts').select('*').order('full_name'),
       supabase.from('companies').select('*').order('name'),
       supabase.from('pipeline_stages').select('*').order('sort_order'),
-      supabase.from('system_settings').select('services, lead_custom_fields, lead_sources').eq('id', 1).single(),
+      supabase.from('system_settings').select('services, lead_custom_fields, lead_sources, currency_mapping').eq('id', 1).single(),
       supabase.from('tags').select('*').order('name')
     ]) as any;
     const [{ data: cData }, { data: compData }, { data: stData }, { data: setData }, { data: tagsData }] = results;
@@ -114,6 +115,10 @@ export function LeadFormModal({ isOpen, onClose, lead, onSave }: { isOpen: boole
       setAvailableServices(setData.services || []);
       setCustomFieldsSchema(setData.lead_custom_fields || []);
       setLeadSources(setData.lead_sources || []);
+      const mapping = setData.currency_mapping || {};
+      setCurrencyMapping(mapping);
+      // New leads start in the default currency for their region (Settings > Currency & FX)
+      if (!lead) setFormData((f: any) => ({ ...f, currency: mapping[f.region] || f.currency }));
     }
   }
 
@@ -217,7 +222,11 @@ export function LeadFormModal({ isOpen, onClose, lead, onSave }: { isOpen: boole
             <option value="web_development">Web Development</option>
             <option value="marketing">Marketing</option>
           </Select>
-          <Select label="Region" value={formData.region} onChange={e => setFormData({...formData, region: e.target.value})}>
+          <Select label="Region" value={formData.region} onChange={e => setFormData({
+            ...formData,
+            region: e.target.value,
+            ...(!lead && currencyMapping[e.target.value] ? { currency: currencyMapping[e.target.value] } : {}),
+          })}>
             <option value="international">International</option>
             <option value="bangladesh">Bangladesh</option>
           </Select>

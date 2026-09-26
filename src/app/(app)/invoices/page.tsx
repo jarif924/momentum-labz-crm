@@ -58,6 +58,13 @@ export default function InvoicesPage() {
   const [filterStatus, setFilterStatus] = useState('all')
   const [saving, setSaving] = useState(false)
   const toast = useToast()
+  // Settings > Invoicing; these defaults reproduce the previous hardcoded behaviour
+  const [invSettings, setInvSettings] = useState<{ prefix: string; include_year: boolean; default_tax_rate: number; payment_terms_days: number | null; default_gateway: string }>({
+    prefix: 'ML-', include_year: true, default_tax_rate: 0, payment_terms_days: null, default_gateway: 'bkash',
+  })
+  const numberPrefix = (s = invSettings) => `${s.prefix}${s.include_year ? `${new Date().getFullYear()}-` : ''}`
+  const defaultDueDate = (s = invSettings) =>
+    s.payment_terms_days == null ? '' : new Date(Date.now() + s.payment_terms_days * 86400000).toISOString().slice(0, 10)
 
   const [form, setForm] = useState<any>({
     lead_id: '', invoice_number: '', currency: 'BDT',
@@ -71,11 +78,14 @@ export default function InvoicesPage() {
 
   async function fetchData() {
     setLoading(true)
-    const prefix = 'ML-' + new Date().getFullYear() + '-'
-    const [invRes, leadRes] = await Promise.all([
+    const [invRes, leadRes, settingsRes] = await Promise.all([
       (supabase.from('invoices') as any).select('*, leads(contacts(full_name), companies(name))').order('created_at', { ascending: false }),
-      supabase.from('leads').select('id, contacts(full_name)')
+      supabase.from('leads').select('id, contacts(full_name)'),
+      supabase.from('system_settings').select('invoice_settings').eq('id', 1).maybeSingle()
     ])
+    const s = { ...invSettings, ...((settingsRes.data as any)?.invoice_settings ?? {}) }
+    setInvSettings(s)
+    const prefix = numberPrefix(s)
     if (invRes.error || leadRes.error) toast.error(`Couldn't load invoices: ${friendlyError(invRes.error || leadRes.error)}`)
     if (invRes.data) setInvoices(invRes.data)
     if (leadRes.data) setLeads(leadRes.data as any)
@@ -105,11 +115,10 @@ export default function InvoicesPage() {
       })
     } else {
       setEditing(null)
-      const prefix = 'ML-' + new Date().getFullYear() + '-'
       setForm({
-        lead_id: '', invoice_number: nextInvoiceNumber(invoices, prefix),
+        lead_id: '', invoice_number: nextInvoiceNumber(invoices, numberPrefix()),
         currency: 'BDT', type: 'one-time', status: 'draft',
-        gateway: 'bkash', due_date: '', notes: '', tax_rate: 0,
+        gateway: invSettings.default_gateway, due_date: defaultDueDate(), notes: '', tax_rate: invSettings.default_tax_rate,
         discount_amount: 0, is_retainer: false, retainer_month: '',
         payment_reference: '', line_items: [{ ...EMPTY_LINE }]
       })

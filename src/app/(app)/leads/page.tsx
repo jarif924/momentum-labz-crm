@@ -40,6 +40,7 @@ export default function LeadsPage() {
   const [lostDetails, setLostDetails] = useState('');
   const [lostReasons, setLostReasons] = useState<string[]>(DEFAULT_LOST_REASONS);
   const [savingLost, setSavingLost] = useState(false);
+  const [fx, setFx] = useState<{ rates: Record<string, number>; updatedAt: string | null }>({ rates: {}, updatedAt: null });
   const toast = useToast();
 
 
@@ -72,12 +73,13 @@ export default function LeadsPage() {
       supabase.from('pipeline_stages').select('*').order('sort_order'),
       supabase.from('leads').select('*, contacts(*), companies(*), lead_tags(tags(id, name))').order('created_at', { ascending: false }),
       supabase.from('tags').select('*').order('name'),
-      supabase.from('system_settings').select('lost_reasons').eq('id', 1).maybeSingle()
+      supabase.from('system_settings').select('lost_reasons, fx_rates, fx_rates_updated_at').eq('id', 1).maybeSingle()
     ]);
     const loadError = stagesErr || leadsErr || tagsErr;
     if (loadError) toast.error(`Couldn't load leads: ${friendlyError(loadError)}`);
     const reasons = (settingsData as any)?.lost_reasons;
     if (Array.isArray(reasons) && reasons.length > 0) setLostReasons(reasons);
+    setFx({ rates: (settingsData as any)?.fx_rates ?? {}, updatedAt: (settingsData as any)?.fx_rates_updated_at ?? null });
     if (tagsData) setAllTags(tagsData);
 
     if (stagesData) setStages(stagesData);
@@ -251,6 +253,8 @@ export default function LeadsPage() {
             stages={stages} 
             onStageChange={handleStageChange}
             onCardClick={(lead) => { setSelectedLead(lead); setIsDrawerOpen(true); }}
+            fxRates={fx.rates}
+            fxUpdatedAt={fx.updatedAt}
           />
         ) : (
           <LeadsList 

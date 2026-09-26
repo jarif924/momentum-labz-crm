@@ -7,6 +7,7 @@ import {
 } from 'lucide-react'
 import { TeamManager } from './_components/legacy'
 import { CustomFieldsSection } from './_components/CustomFieldsSection'
+import { CompanySection, CurrencySection, InvoicingSection } from './_components/FormSections'
 import { LeadSourcesSection, ServicesSection, TagsSection } from './_components/ListSections'
 import { PipelineSection } from './_components/PipelineSection'
 
@@ -45,12 +46,15 @@ const GROUPS: { label: string; items: { id: SectionId; label: string; icon: Luci
 
 // Sections are added here as they are built; the menu only shows these.
 const SECTIONS: Partial<Record<SectionId, ComponentType>> = {
+  company: CompanySection,
   team: TeamManager,
   pipeline: PipelineSection,
   sources: LeadSourcesSection,
   services: ServicesSection,
   tags: TagsSection,
   fields: CustomFieldsSection,
+  currency: CurrencySection,
+  invoicing: InvoicingSection,
 }
 
 const DEFAULT_SECTION: SectionId = 'pipeline'
