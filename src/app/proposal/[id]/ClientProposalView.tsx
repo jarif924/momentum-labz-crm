@@ -11,14 +11,12 @@ export function ClientProposalView({ proposal }: { proposal: any }) {
   const [accepted, setAccepted] = useState(proposal.status === 'accepted')
   const [error, setError] = useState('')
 
-  const subtotal = (proposal.line_items || []).reduce((acc: number, item: any) => acc + (Number(item.qty) * Number(item.unit_price)), 0)
-  const discount = Number(proposal.discount_amount) || 0
-  const tax = Number(proposal.tax_rate) > 0 ? (subtotal - discount) * (Number(proposal.tax_rate) / 100) : 0
-  const total = subtotal - discount + tax
+  const total = Number(proposal.amount) || 0
+  const servicesList = Array.isArray(proposal.services) ? proposal.services.join(', ') : 'Custom Project'
 
   async function handleAccept() {
-    if (!signature.trim()) {
-      setError('Please type your full name to sign.')
+    if (signature.trim().length < 2) {
+      setError('Please type your full name (at least 2 characters) to sign.')
       return
     }
     setLoading(true)
@@ -79,42 +77,20 @@ export function ClientProposalView({ proposal }: { proposal: any }) {
             <thead className="bg-neutral-50 border-b border-neutral-100 text-neutral-500">
               <tr>
                 <th className="py-3 px-4 font-medium">Description</th>
-                <th className="py-3 px-4 font-medium w-24 text-right">Qty</th>
-                <th className="py-3 px-4 font-medium w-32 text-right">Price</th>
                 <th className="py-3 px-4 font-medium w-32 text-right">Total</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-neutral-100">
-              {(proposal.line_items || []).map((item: any, idx: number) => (
-                <tr key={idx}>
-                  <td className="py-4 px-4 text-neutral-900">{item.description}</td>
-                  <td className="py-4 px-4 text-neutral-500 text-right">{item.qty}</td>
-                  <td className="py-4 px-4 text-neutral-500 text-right">{proposal.currency} {Number(item.unit_price).toLocaleString()}</td>
-                  <td className="py-4 px-4 text-neutral-900 font-medium text-right">{proposal.currency} {(item.qty * item.unit_price).toLocaleString()}</td>
-                </tr>
-              ))}
+              <tr>
+                <td className="py-4 px-4 text-neutral-900">{servicesList}</td>
+                <td className="py-4 px-4 text-neutral-900 font-medium text-right">{proposal.currency} {total.toLocaleString()}</td>
+              </tr>
             </tbody>
           </table>
         </div>
 
         <div className="flex justify-end mb-12">
           <div className="w-full max-w-sm space-y-3 text-sm">
-            <div className="flex justify-between text-neutral-500">
-              <span>Subtotal</span>
-              <span>{proposal.currency} {subtotal.toLocaleString()}</span>
-            </div>
-            {discount > 0 && (
-              <div className="flex justify-between text-danger-500">
-                <span>Discount</span>
-                <span>-{proposal.currency} {discount.toLocaleString()}</span>
-              </div>
-            )}
-            {tax > 0 && (
-              <div className="flex justify-between text-neutral-500">
-                <span>Tax ({proposal.tax_rate}%)</span>
-                <span>{proposal.currency} {tax.toLocaleString()}</span>
-              </div>
-            )}
             <div className="flex justify-between text-lg font-semibold text-neutral-900 pt-3 border-t border-neutral-100">
               <span>Total Investment</span>
               <span>{proposal.currency} {total.toLocaleString()}</span>
