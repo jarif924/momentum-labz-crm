@@ -6,6 +6,8 @@ import { Modal } from '@/components/ui/Modal';
 import { Button, Input, Select } from '@/components/ui/Forms';
 import { createBrowserClient } from '@supabase/ssr';
 import { Database } from '@/types/supabase';
+import { useToast } from '@/components/ui/Toast';
+import { friendlyError } from '@/lib/errors';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function LeadFormModal({ isOpen, onClose, lead, onSave }: { isOpen: boolean, onClose: () => void, lead?: any, onSave: () => void }) {
@@ -38,6 +40,7 @@ export function LeadFormModal({ isOpen, onClose, lead, onSave }: { isOpen: boole
   const [customFieldsSchema, setCustomFieldsSchema] = useState<any[]>([]);
   const [availableTags, setAvailableTags] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+  const toast = useToast();
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
@@ -61,7 +64,8 @@ export function LeadFormModal({ isOpen, onClose, lead, onSave }: { isOpen: boole
         running_meta_ads: lead.running_meta_ads || false,
           custom_fields: lead.custom_fields || {},
           service_line: lead.service_line || 'web_development',
-          tags: lead.lead_tags?.map((lt: any) => lt.tag_id) || []
+          // leads are loaded with lead_tags(tags(id, name)), so the id is nested
+          tags: (lead.lead_tags || []).map((lt: any) => lt.tag_id ?? lt.tags?.id).filter(Boolean)
         });
       } else {
         setFormData({
@@ -88,19 +92,16 @@ export function LeadFormModal({ isOpen, onClose, lead, onSave }: { isOpen: boole
   }, [isOpen, lead]);
 
   async function fetchData() {
-    const [
-      { data: cData }, 
-      { data: compData }, 
-      { data: stData },
-      { data: setData },
-      { data: tagsData }
-    ] = await Promise.all([
+    const results = await Promise.all([
       supabase.from('contacts').select('*').order('full_name'),
       supabase.from('companies').select('*').order('name'),
       supabase.from('pipeline_stages').select('*').order('sort_order'),
       supabase.from('system_settings').select('services, lead_custom_fields').eq('id', 1).single(),
       supabase.from('tags').select('*').order('name')
     ]) as any;
+    const [{ data: cData }, { data: compData }, { data: stData }, { data: setData }, { data: tagsData }] = results;
+    const loadError = results.find((r: any) => r.error)?.error;
+    if (loadError) toast.error(`Couldn't load form options: ${friendlyError(loadError)}`);
 
     if (cData) setContacts(cData);
     if (compData) setCompanies(compData);
@@ -113,17 +114,23 @@ export function LeadFormModal({ isOpen, onClose, lead, onSave }: { isOpen: boole
   }
 
   async function handleSubmit() {
+    if (!formData.contact_id) { toast.error('Choose a contact or create a new one.'); return; }
+    if (formData.contact_id === 'NEW' && !formData.new_contact_name?.trim()) { toast.error('Enter the new contact’s name.'); return; }
+    if (formData.company_id === 'NEW' && !formData.new_company_name?.trim()) { toast.error('Enter the new company’s name.'); return; }
+    if (loading) return;
     setLoading(true);
     try {
       let finalContactId = formData.contact_id;
-      if (formData.contact_id === 'NEW' && formData.new_contact_name) {
-        const { data: c } = await (supabase.from('contacts') as any).insert({ full_name: formData.new_contact_name }).select().single();
+      if (formData.contact_id === 'NEW') {
+        const { data: c, error } = await (supabase.from('contacts') as any).insert({ full_name: formData.new_contact_name.trim() }).select().single();
+        if (error || !c) throw error;
         finalContactId = c.id;
       }
 
       let finalCompanyId = formData.company_id || null;
-      if (formData.company_id === 'NEW' && formData.new_company_name) {
-        const { data: comp } = await (supabase.from('companies') as any).insert({ name: formData.new_company_name }).select().single();
+      if (formData.company_id === 'NEW') {
+        const { data: comp, error } = await (supabase.from('companies') as any).insert({ name: formData.new_company_name.trim() }).select().single();
+        if (error || !comp) throw error;
         finalCompanyId = comp.id;
       }
 
@@ -146,24 +153,26 @@ export function LeadFormModal({ isOpen, onClose, lead, onSave }: { isOpen: boole
 
       let finalLeadId = lead?.id;
       if (lead?.id) {
-        await (supabase.from('leads') as any).update(payload).eq('id', lead.id);
+        const { error } = await (supabase.from('leads') as any).update(payload).eq('id', lead.id);
+        if (error) throw error;
       } else {
-        const { data: newLead } = await (supabase.from('leads') as any).insert(payload).select().single();
-        finalLeadId = newLead?.id;
+        const { data: newLead, error } = await (supabase.from('leads') as any).insert(payload).select().single();
+        if (error || !newLead) throw error;
+        finalLeadId = newLead.id;
       }
-      
-      if (finalLeadId) {
-        // Sync tags
-        await (supabase.from('lead_tags') as any).delete().eq('lead_id', finalLeadId);
-        if (formData.tags && formData.tags.length > 0) {
-          const tagInserts = formData.tags.map((tId: string) => ({ lead_id: finalLeadId, tag_id: tId }));
-          await (supabase.from('lead_tags') as any).insert(tagInserts);
-        }
+
+      // Sync tags
+      const { error: clearErr } = await (supabase.from('lead_tags') as any).delete().eq('lead_id', finalLeadId);
+      if (clearErr) throw clearErr;
+      if (formData.tags && formData.tags.length > 0) {
+        const tagInserts = formData.tags.map((tId: string) => ({ lead_id: finalLeadId, tag_id: tId }));
+        const { error: tagErr } = await (supabase.from('lead_tags') as any).insert(tagInserts);
+        if (tagErr) throw tagErr;
       }
+      toast.success(lead?.id ? 'Lead updated' : 'Lead added');
       onSave();
     } catch (e) {
-      console.error(e);
-      alert('Error saving lead');
+      toast.error(`Couldn't save lead: ${friendlyError(e)}`);
     }
     setLoading(false);
   }
@@ -336,9 +345,9 @@ export function LeadFormModal({ isOpen, onClose, lead, onSave }: { isOpen: boole
                   type="button"
                   onClick={() => {
                     if (isSelected) {
-                      setFormData({...formData, services: formData.services.filter((s: string) => s !== srv), tags: []});
+                      setFormData({...formData, services: formData.services.filter((s: string) => s !== srv)});
                     } else {
-                      setFormData({...formData, services: [...formData.services, srv], tags: []});
+                      setFormData({...formData, services: [...formData.services, srv]});
                     }
                   }}
                   className={`px-3 py-1.5 text-xs rounded-full border ${isSelected ? 'bg-accent-50 border-accent-500 text-accent-700' : 'bg-neutral-0 border-neutral-200 text-neutral-500'}`}
