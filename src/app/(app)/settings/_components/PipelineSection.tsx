@@ -158,7 +158,8 @@ function StagesCard() {
               className={`flex flex-wrap items-center gap-3 px-4 py-3 transition-colors duration-120 sm:flex-nowrap sm:px-6 ${rowDragClass(i, drag.dragIndex, drag.overIndex)}`}
             >
               <ReorderControls index={i} count={stages.length} onMove={reorder} handleProps={drag.handleProps(i)} name={stage.name} />
-              <div className="min-w-0 flex-1">
+              {/* On phones the name keeps most of the row and the controls wrap below it */}
+              <div className="min-w-[60%] flex-1 sm:min-w-0">
                 <EditableText value={stage.name} label={`stage ${stage.name}`} onSave={name => rename(stage, name)} />
                 <p className="text-small text-neutral-500">{counts[stage.name] ?? 0} lead{(counts[stage.name] ?? 0) === 1 ? '' : 's'}</p>
               </div>
@@ -211,7 +212,7 @@ function KindPicker({ value, onChange, name }: { value: Kind; onChange: (k: Kind
     { id: 'lost', label: 'Lost', active: 'bg-danger-bg text-danger-text' },
   ]
   return (
-    <div role="radiogroup" aria-label={`Type of stage ${name}`} className="flex shrink-0 rounded-md border border-neutral-200 p-0.5">
+    <div role="radiogroup" aria-label={`Type of stage ${name}`} className="ml-auto flex shrink-0 rounded-md border border-neutral-200 p-0.5 sm:ml-0">
       {options.map(o => (
         <button
           key={o.id}

@@ -1,6 +1,6 @@
 'use client'
 
-import { Suspense, type ComponentType } from 'react'
+import { Suspense, useEffect, type ComponentType } from 'react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import {
   Briefcase, Building2, CircleUser, Coins, Columns3, Megaphone, Receipt, SlidersHorizontal, Tag, Users, type LucideIcon,
@@ -83,6 +83,13 @@ function SettingsHub() {
   function open(id: SectionId) {
     router.replace(`${pathname}?tab=${id}`, { scroll: false })
   }
+
+  // On phones the menu is a horizontal strip; keep the open section visible in it
+  useEffect(() => {
+    if (window.matchMedia('(min-width: 768px)').matches) return
+    document.querySelector('nav[aria-label="Settings sections"] [aria-current="page"]')
+      ?.scrollIntoView({ inline: 'center', block: 'nearest' })
+  }, [active])
 
   return (
     <div className="max-w-6xl">
