@@ -5,7 +5,8 @@ import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import {
   Briefcase, Building2, CircleUser, Coins, Columns3, Megaphone, Receipt, SlidersHorizontal, Tag, Users, type LucideIcon,
 } from 'lucide-react'
-import { CustomFieldsManager, TeamManager } from './_components/legacy'
+import { TeamManager } from './_components/legacy'
+import { CustomFieldsSection } from './_components/CustomFieldsSection'
 import { LeadSourcesSection, ServicesSection, TagsSection } from './_components/ListSections'
 import { PipelineSection } from './_components/PipelineSection'
 
@@ -49,7 +50,7 @@ const SECTIONS: Partial<Record<SectionId, ComponentType>> = {
   sources: LeadSourcesSection,
   services: ServicesSection,
   tags: TagsSection,
-  fields: CustomFieldsManager,
+  fields: CustomFieldsSection,
 }
 
 const DEFAULT_SECTION: SectionId = 'pipeline'

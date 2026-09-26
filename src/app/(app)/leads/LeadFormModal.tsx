@@ -8,6 +8,8 @@ import { createBrowserClient } from '@supabase/ssr';
 import { Database } from '@/types/supabase';
 import { useToast } from '@/components/ui/Toast';
 import { friendlyError } from '@/lib/errors';
+import { CustomFieldInput } from '@/components/ui/CustomFieldInput';
+import { validateCustomFields, type CustomFieldDef } from '@/lib/customFields';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function LeadFormModal({ isOpen, onClose, lead, onSave }: { isOpen: boolean, onClose: () => void, lead?: any, onSave: () => void }) {
@@ -119,6 +121,8 @@ export function LeadFormModal({ isOpen, onClose, lead, onSave }: { isOpen: boole
     if (!formData.contact_id) { toast.error('Choose a contact or create a new one.'); return; }
     if (formData.contact_id === 'NEW' && !formData.new_contact_name?.trim()) { toast.error('Enter the new contact’s name.'); return; }
     if (formData.company_id === 'NEW' && !formData.new_company_name?.trim()) { toast.error('Enter the new company’s name.'); return; }
+    const fieldError = validateCustomFields(customFieldsSchema, formData.custom_fields || {});
+    if (fieldError) { toast.error(fieldError); return; }
     if (loading) return;
     setLoading(true);
     try {
@@ -278,29 +282,13 @@ export function LeadFormModal({ isOpen, onClose, lead, onSave }: { isOpen: boole
           <div className="pt-2">
             <label className="block text-xs font-semibold text-neutral-500 uppercase tracking-wider mb-3">Custom Fields</label>
             <div className="flex flex-col gap-3">
-              {customFieldsSchema.map(field => (
-                <div key={field.id}>
-                  {field.type === 'url' ? (
-                    <Input 
-                      label={field.name}
-                      placeholder="https://..."
-                      value={formData.custom_fields[field.id] || ''}
-                      onChange={e => setFormData({
-                        ...formData, 
-                        custom_fields: { ...formData.custom_fields, [field.id]: e.target.value }
-                      })}
-                    />
-                  ) : (
-                    <Input 
-                      label={field.name}
-                      value={formData.custom_fields[field.id] || ''}
-                      onChange={e => setFormData({
-                        ...formData, 
-                        custom_fields: { ...formData.custom_fields, [field.id]: e.target.value }
-                      })}
-                    />
-                  )}
-                </div>
+              {customFieldsSchema.map((field: CustomFieldDef) => (
+                <CustomFieldInput
+                  key={field.id}
+                  field={field}
+                  value={formData.custom_fields?.[field.id]}
+                  onChange={v => setFormData((f: any) => ({ ...f, custom_fields: { ...f.custom_fields, [field.id]: v } }))}
+                />
               ))}
             </div>
           </div>

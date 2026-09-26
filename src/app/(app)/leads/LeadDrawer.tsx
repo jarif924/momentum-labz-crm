@@ -9,6 +9,7 @@ import { createBrowserClient } from '@supabase/ssr';
 import { Database } from '@/types/supabase';
 import { useToast } from '@/components/ui/Toast';
 import { friendlyError } from '@/lib/errors';
+import { formatCustomValue, type CustomFieldDef } from '@/lib/customFields';
 
 // activities.channel only accepts these; other next-action types are logged as notes
 const ACTIVITY_CHANNELS = ['whatsapp', 'email', 'instagram_dm', 'call', 'meeting', 'note'];
@@ -35,6 +36,7 @@ export function LeadDrawer({ isOpen, onClose, lead }: { isOpen: boolean, onClose
   const [isEditingAction, setIsEditingAction] = useState(false);
   // What is actually stored for this lead; the `lead` prop is not refreshed after a save
   const [sourceLabels, setSourceLabels] = useState<Record<string, string>>({});
+  const [fieldSchema, setFieldSchema] = useState<CustomFieldDef[]>([]);
   const [savedAction, setSavedAction] = useState<{ type: string | null; date: string | null; notes: string | null } | null>(null);
   const toast = useToast();
 
@@ -116,10 +118,11 @@ export function LeadDrawer({ isOpen, onClose, lead }: { isOpen: boolean, onClose
       supabase.from('activities').select('*').eq('lead_id', lead.id).order('created_at', { ascending: false }),
       supabase.from('proposals').select('*').eq('lead_id', lead.id).order('created_at', { ascending: false }),
       supabase.from('invoices').select('*').eq('lead_id', lead.id).order('created_at', { ascending: false }),
-      supabase.from('system_settings').select('lead_sources').eq('id', 1).maybeSingle(),
+      supabase.from('system_settings').select('lead_sources, lead_custom_fields').eq('id', 1).maybeSingle(),
     ]);
     const sources = ((settingsRes.data as any)?.lead_sources ?? []) as { id: string; label: string }[];
     setSourceLabels(Object.fromEntries(sources.map(s => [s.id, s.label])));
+    setFieldSchema(((settingsRes.data as any)?.lead_custom_fields ?? []) as CustomFieldDef[]);
     const loadError = actsRes.error || propsRes.error || invsRes.error;
     if (loadError) toast.error(`Couldn't load lead history: ${friendlyError(loadError)}`);
     const acts = actsRes.data, props = propsRes.data, invs = invsRes.data;
@@ -322,29 +325,30 @@ export function LeadDrawer({ isOpen, onClose, lead }: { isOpen: boolean, onClose
 
 
           {/* Custom Fields */}
-          {lead.custom_fields && Object.keys(lead.custom_fields).length > 0 && (
-            <div>
-              <h3 className="text-sm font-semibold text-neutral-900 mb-3 pb-2 border-b border-neutral-100">Custom Fields</h3>
-              <div className="grid grid-cols-2 gap-4">
-                {Object.entries(lead.custom_fields).map(([key, value]) => {
-                  const label = key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
-                  const isLink = typeof value === 'string' && value.startsWith('http');
-                  return (
-                    <div key={key}>
-                      <p className="text-xs font-semibold text-neutral-400 uppercase tracking-wider mb-1">{label}</p>
-                      {isLink ? (
-                        <a href={value} target="_blank" rel="noreferrer" className="text-sm text-accent-500 hover:underline break-all">
-                          {value}
-                        </a>
+          {(() => {
+            // Show fields in the order and with the names set in Settings; deleted fields stay hidden
+            const filled = fieldSchema
+              .map(f => ({ f, text: formatCustomValue(f, lead.custom_fields?.[f.id]) }))
+              .filter(x => x.text !== null);
+            if (filled.length === 0) return null;
+            return (
+              <div>
+                <h3 className="text-sm font-semibold text-neutral-900 mb-3 pb-2 border-b border-neutral-100">Custom Fields</h3>
+                <div className="grid grid-cols-2 gap-4">
+                  {filled.map(({ f, text }) => (
+                    <div key={f.id}>
+                      <p className="text-xs font-semibold text-neutral-400 uppercase tracking-wider mb-1">{f.name}</p>
+                      {f.type === 'url' ? (
+                        <a href={text!} target="_blank" rel="noreferrer" className="text-sm text-info-text hover:underline break-all">{text}</a>
                       ) : (
-                        <p className="text-sm text-neutral-900">{value as React.ReactNode || '-'}</p>
+                        <p className="text-sm text-neutral-900 whitespace-pre-line break-words">{text}</p>
                       )}
                     </div>
-                  );
-                })}
+                  ))}
+                </div>
               </div>
-            </div>
-          )}
+            );
+          })()}
 
           {/* Services */}
           {lead.services?.length > 0 && (
