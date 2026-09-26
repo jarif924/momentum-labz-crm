@@ -7,8 +7,19 @@ import { Database } from '@/types/supabase'
 import { Button, Input, Select } from '@/components/ui/Forms'
 import { Modal } from '@/components/ui/Modal'
 import { Plus, Edit2, Trash2, Receipt, Printer, X, RefreshCw } from 'lucide-react'
+import { useToast } from '@/components/ui/Toast'
+import { friendlyError } from '@/lib/errors'
 
 type LineItem = { description: string; qty: number; unit_price: number }
+
+// Next number after the highest existing one for this prefix, so deletions never cause collisions
+function nextInvoiceNumber(existing: { invoice_number?: string }[], prefix: string) {
+  const max = existing.reduce((m, inv) => {
+    const n = inv.invoice_number?.startsWith(prefix) ? parseInt(inv.invoice_number.slice(prefix.length), 10) : NaN
+    return Number.isFinite(n) && n > m ? n : m
+  }, 0)
+  return `${prefix}${String(max + 1).padStart(3, '0')}`
+}
 
 const EMPTY_LINE: LineItem = { description: '', qty: 1, unit_price: 0 }
 
@@ -45,6 +56,8 @@ export default function InvoicesPage() {
   const [modalOpen, setModalOpen] = useState(false)
   const [editing, setEditing] = useState<any>(null)
   const [filterStatus, setFilterStatus] = useState('all')
+  const [saving, setSaving] = useState(false)
+  const toast = useToast()
 
   const [form, setForm] = useState<any>({
     lead_id: '', invoice_number: '', currency: 'BDT',
@@ -63,12 +76,11 @@ export default function InvoicesPage() {
       (supabase.from('invoices') as any).select('*, leads(contacts(full_name), companies(name))').order('created_at', { ascending: false }),
       supabase.from('leads').select('id, contacts(full_name)')
     ])
+    if (invRes.error || leadRes.error) toast.error(`Couldn't load invoices: ${friendlyError(invRes.error || leadRes.error)}`)
     if (invRes.data) setInvoices(invRes.data)
     if (leadRes.data) setLeads(leadRes.data as any)
 
-    // Set auto invoice number
-    const count = invRes.data?.length || 0
-    setForm((f: any) => ({ ...f, invoice_number: `${prefix}${String(count + 1).padStart(3, '0')}` }))
+    setForm((f: any) => ({ ...f, invoice_number: nextInvoiceNumber(invRes.data || [], prefix) }))
     setLoading(false)
   }
 
@@ -95,7 +107,7 @@ export default function InvoicesPage() {
       setEditing(null)
       const prefix = 'ML-' + new Date().getFullYear() + '-'
       setForm({
-        lead_id: '', invoice_number: `${prefix}${String(invoices.length + 1).padStart(3, '0')}`,
+        lead_id: '', invoice_number: nextInvoiceNumber(invoices, prefix),
         currency: 'BDT', type: 'one-time', status: 'draft',
         gateway: 'bkash', due_date: '', notes: '', tax_rate: 0,
         discount_amount: 0, is_retainer: false, retainer_month: '',
@@ -127,7 +139,9 @@ export default function InvoicesPage() {
   }
 
   async function handleSave() {
-    if (!form.lead_id || !form.invoice_number) return
+    if (!form.lead_id) { toast.error('Choose the client (lead) this invoice is for.'); return }
+    if (!form.invoice_number?.trim()) { toast.error('Enter an invoice number.'); return }
+    if (saving) return
     const total = calcTotal(form.line_items, Number(form.tax_rate), Number(form.discount_amount))
     const payload: any = {
       lead_id: form.lead_id, invoice_number: form.invoice_number,
@@ -146,18 +160,30 @@ export default function InvoicesPage() {
     } else if (form.status !== 'paid') {
       payload.paid_at = null
     }
-    if (editing) {
-      await (supabase.from('invoices') as any).update(payload).eq('id', editing.id)
-    } else {
-      await (supabase.from('invoices') as any).insert(payload)
+    setSaving(true)
+    const { error } = editing
+      ? await (supabase.from('invoices') as any).update(payload).eq('id', editing.id)
+      : await (supabase.from('invoices') as any).insert(payload)
+    setSaving(false)
+    if (error) {
+      toast.error(error.code === '23505'
+        ? `Invoice number ${form.invoice_number} already exists. Use a different number.`
+        : `Couldn't save invoice: ${friendlyError(error)}`)
+      return
     }
+    toast.success(editing ? 'Invoice updated' : 'Invoice created')
     setModalOpen(false)
     fetchData()
   }
 
   async function handleDelete(id: string) {
     if (!confirm('Delete this invoice?')) return
-    await (supabase.from('invoices') as any).delete().eq('id', id)
+    const { error } = await (supabase.from('invoices') as any).delete().eq('id', id)
+    if (error) {
+      toast.error(`Couldn't delete invoice: ${friendlyError(error)}`)
+      return
+    }
+    toast.success('Invoice deleted')
     fetchData()
   }
 
@@ -383,7 +409,7 @@ export default function InvoicesPage() {
 
           <div className="flex justify-end gap-3 pt-3 border-t border-neutral-100">
             <Button variant="secondary" onClick={() => setModalOpen(false)}>Cancel</Button>
-            <Button onClick={handleSave} disabled={!form.lead_id || !form.invoice_number}>Save Invoice</Button>
+            <Button onClick={handleSave} disabled={!form.lead_id || !form.invoice_number || saving}>{saving ? 'Saving…' : 'Save Invoice'}</Button>
           </div>
         </div>
       </Modal>
