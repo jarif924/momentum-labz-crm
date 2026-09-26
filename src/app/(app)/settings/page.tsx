@@ -5,7 +5,8 @@ import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import {
   Briefcase, Building2, CircleUser, Coins, Columns3, Megaphone, Receipt, SlidersHorizontal, Tag, Users, type LucideIcon,
 } from 'lucide-react'
-import { CustomFieldsManager, ServicesManager, TeamManager } from './_components/legacy'
+import { CustomFieldsManager, TeamManager } from './_components/legacy'
+import { LeadSourcesSection, ServicesSection, TagsSection } from './_components/ListSections'
 import { PipelineSection } from './_components/PipelineSection'
 
 type SectionId =
@@ -45,7 +46,9 @@ const GROUPS: { label: string; items: { id: SectionId; label: string; icon: Luci
 const SECTIONS: Partial<Record<SectionId, ComponentType>> = {
   team: TeamManager,
   pipeline: PipelineSection,
-  services: ServicesManager,
+  sources: LeadSourcesSection,
+  services: ServicesSection,
+  tags: TagsSection,
   fields: CustomFieldsManager,
 }
 

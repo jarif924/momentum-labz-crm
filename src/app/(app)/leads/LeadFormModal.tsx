@@ -39,6 +39,7 @@ export function LeadFormModal({ isOpen, onClose, lead, onSave }: { isOpen: boole
   const [availableServices, setAvailableServices] = useState<string[]>([]);
   const [customFieldsSchema, setCustomFieldsSchema] = useState<any[]>([]);
   const [availableTags, setAvailableTags] = useState<any[]>([]);
+  const [leadSources, setLeadSources] = useState<{ id: string; label: string }[]>([]);
   const [loading, setLoading] = useState(false);
   const toast = useToast();
 
@@ -96,7 +97,7 @@ export function LeadFormModal({ isOpen, onClose, lead, onSave }: { isOpen: boole
       supabase.from('contacts').select('*').order('full_name'),
       supabase.from('companies').select('*').order('name'),
       supabase.from('pipeline_stages').select('*').order('sort_order'),
-      supabase.from('system_settings').select('services, lead_custom_fields').eq('id', 1).single(),
+      supabase.from('system_settings').select('services, lead_custom_fields, lead_sources').eq('id', 1).single(),
       supabase.from('tags').select('*').order('name')
     ]) as any;
     const [{ data: cData }, { data: compData }, { data: stData }, { data: setData }, { data: tagsData }] = results;
@@ -110,6 +111,7 @@ export function LeadFormModal({ isOpen, onClose, lead, onSave }: { isOpen: boole
     if (setData) {
       setAvailableServices(setData.services || []);
       setCustomFieldsSchema(setData.lead_custom_fields || []);
+      setLeadSources(setData.lead_sources || []);
     }
   }
 
@@ -140,7 +142,7 @@ export function LeadFormModal({ isOpen, onClose, lead, onSave }: { isOpen: boole
         services: formData.services,
         region: formData.region,
         preferred_channel: formData.preferred_channel,
-        source: formData.source,
+        source: formData.source || null,
         stage: formData.stage,
         deal_value: formData.deal_value ? parseFloat(formData.deal_value) : null,
       currency: formData.currency,
@@ -222,12 +224,11 @@ export function LeadFormModal({ isOpen, onClose, lead, onSave }: { isOpen: boole
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <Select label="Source" value={formData.source} onChange={e => setFormData({...formData, source: e.target.value})}>
-            <option value="meta_ad_library_scan">Meta Ad Library</option>
-            <option value="instagram_dm">Instagram DM</option>
-            <option value="referral">Referral</option>
-            <option value="inbound_form">Inbound Form</option>
-            <option value="cold_outreach">Cold Outreach</option>
-            <option value="other">Other</option>
+            <option value="">Not set</option>
+            {leadSources.map(s => <option key={s.id} value={s.id}>{s.label}</option>)}
+            {formData.source && !leadSources.some(s => s.id === formData.source) && (
+              <option value={formData.source}>{formData.source.replace(/_/g, ' ')} (removed)</option>
+            )}
           </Select>
           <Select label="Preferred Channel" value={formData.preferred_channel} onChange={e => setFormData({...formData, preferred_channel: e.target.value})}>
             <option value="email">Email</option>
