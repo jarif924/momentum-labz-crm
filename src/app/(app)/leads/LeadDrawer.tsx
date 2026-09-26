@@ -7,6 +7,12 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { FileText as FileTextIcon, Receipt, Activity } from 'lucide-react';
 import { createBrowserClient } from '@supabase/ssr';
 import { Database } from '@/types/supabase';
+import { useToast } from '@/components/ui/Toast';
+import { friendlyError } from '@/lib/errors';
+
+// activities.channel only accepts these; other next-action types are logged as notes
+const ACTIVITY_CHANNELS = ['whatsapp', 'email', 'instagram_dm', 'call', 'meeting', 'note'];
+const ACTION_LABELS: Record<string, string> = { call: 'Call', email: 'Email', meeting: 'Meeting', demo: 'Demo', follow_up: 'Follow Up' };
 
 export function LeadDrawer({ isOpen, onClose, lead }: { isOpen: boolean, onClose: () => void, lead: any }) {
   const supabase = createBrowserClient<Database>(
@@ -27,7 +33,20 @@ export function LeadDrawer({ isOpen, onClose, lead }: { isOpen: boolean, onClose
   const [nextActionDate, setNextActionDate] = useState(lead?.next_action_date ? lead.next_action_date.split('T')[0] : '');
   const [nextActionNotes, setNextActionNotes] = useState(lead?.next_action_notes || '');
   const [isEditingAction, setIsEditingAction] = useState(false);
+  // What is actually stored for this lead; the `lead` prop is not refreshed after a save
+  const [savedAction, setSavedAction] = useState<{ type: string | null; date: string | null; notes: string | null } | null>(null);
+  const toast = useToast();
 
+  // The drawer stays mounted between leads, so reload the next action whenever the lead changes
+  useEffect(() => {
+    setNextActionType(lead?.next_action_type || 'call');
+    setNextActionDate(lead?.next_action_date ? lead.next_action_date.split('T')[0] : '');
+    setNextActionNotes(lead?.next_action_notes || '');
+    setSavedAction(lead?.next_action_type || lead?.next_action_date
+      ? { type: lead.next_action_type, date: lead.next_action_date, notes: lead.next_action_notes }
+      : null);
+    setIsEditingAction(false);
+  }, [lead?.id, lead?.next_action_type, lead?.next_action_date, lead?.next_action_notes]);
 
   useEffect(() => {
     if (isOpen && lead?.id) {
@@ -47,26 +66,41 @@ export function LeadDrawer({ isOpen, onClose, lead }: { isOpen: boolean, onClose
       })
       .eq('id', lead.id);
     setLoading(false);
-    if (!error) setIsEditingAction(false);
+    if (error) {
+      toast.error(`Couldn't save next action: ${friendlyError(error)}`);
+      return;
+    }
+    toast.success('Next action saved');
+    setSavedAction({ type: nextActionType, date: nextActionDate || null, notes: nextActionNotes || null });
+    setIsEditingAction(false);
   }
 
   async function handleCompleteAction() {
     setLoading(true);
-    // log to activity timeline automatically
-    await (supabase.from('activities') as any).insert({
+    const label = ACTION_LABELS[nextActionType] || 'Action';
+    const { error: logErr } = await (supabase.from('activities') as any).insert({
       lead_id: lead.id,
-      channel: nextActionType,
-      summary: `Completed Action: ${nextActionNotes}`,
+      channel: ACTIVITY_CHANNELS.includes(nextActionType) ? nextActionType : 'note',
+      summary: `Completed ${label}${nextActionNotes ? `: ${nextActionNotes}` : ''}`,
       direction: 'outbound'
     });
-    
-    // clear next action
-    await supabase.from('leads').update({
+    if (logErr) {
+      setLoading(false);
+      toast.error(`Couldn't log the completed action: ${friendlyError(logErr)}`);
+      return;
+    }
+
+    const { error: clearErr } = await supabase.from('leads').update({
       next_action_type: null,
       next_action_date: null,
       next_action_notes: null
     }).eq('id', lead.id);
-    
+    if (clearErr) toast.error(`Action logged, but couldn't clear it: ${friendlyError(clearErr)}`);
+    else {
+      toast.success(`${label} marked as done`);
+      setSavedAction(null);
+    }
+
     setNextActionType('call');
     setNextActionDate('');
     setNextActionNotes('');
@@ -77,24 +111,15 @@ export function LeadDrawer({ isOpen, onClose, lead }: { isOpen: boolean, onClose
 
   async function fetchActivities() {
     setLoading(true);
-    const { data: acts } = await supabase
-      .from('activities')
-      .select('*')
-      .eq('lead_id', lead.id)
-      .order('created_at', { ascending: false });
-      
-    const { data: props } = await supabase
-      .from('proposals')
-      .select('*')
-      .eq('lead_id', lead.id)
-      .order('created_at', { ascending: false });
-      
-    const { data: invs } = await supabase
-      .from('invoices')
-      .select('*')
-      .eq('lead_id', lead.id)
-      .order('created_at', { ascending: false });
-    
+    const [actsRes, propsRes, invsRes] = await Promise.all([
+      supabase.from('activities').select('*').eq('lead_id', lead.id).order('created_at', { ascending: false }),
+      supabase.from('proposals').select('*').eq('lead_id', lead.id).order('created_at', { ascending: false }),
+      supabase.from('invoices').select('*').eq('lead_id', lead.id).order('created_at', { ascending: false }),
+    ]);
+    const loadError = actsRes.error || propsRes.error || invsRes.error;
+    if (loadError) toast.error(`Couldn't load lead history: ${friendlyError(loadError)}`);
+    const acts = actsRes.data, props = propsRes.data, invs = invsRes.data;
+
     if (acts) setActivities(acts);
     if (props) setProposals(props);
     if (invs) setInvoices(invs);
@@ -104,12 +129,17 @@ export function LeadDrawer({ isOpen, onClose, lead }: { isOpen: boolean, onClose
   async function handleAddActivity() {
     if (!newActivity.trim()) return;
     setLoading(true);
-    await (supabase.from('activities') as any).insert({
+    const { error } = await (supabase.from('activities') as any).insert({
       lead_id: lead.id,
       channel: newChannel,
       summary: newActivity.trim(),
       direction: 'outbound'
     });
+    if (error) {
+      setLoading(false);
+      toast.error(`Couldn't add note: ${friendlyError(error)}`);
+      return;
+    }
     setNewActivity('');
     fetchActivities();
   }
@@ -192,13 +222,13 @@ export function LeadDrawer({ isOpen, onClose, lead }: { isOpen: boolean, onClose
               </div>
             ) : (
               <div>
-                {lead.next_action_date ? (
+                {savedAction ? (
                   <div className="flex flex-col gap-2">
                     <div className="flex items-center gap-2 text-sm text-warning-900">
-                      <span className="capitalize font-semibold">{lead.next_action_type || 'Follow up'}</span>
-                      <span className="text-warning-700">on {new Date(lead.next_action_date).toLocaleDateString()}</span>
+                      <span className="font-semibold">{ACTION_LABELS[savedAction.type || ''] || 'Follow Up'}</span>
+                      {savedAction.date && <span className="text-warning-700">on {new Date(savedAction.date).toLocaleDateString()}</span>}
                     </div>
-                    {lead.next_action_notes && <p className="text-sm text-warning-800">{lead.next_action_notes}</p>}
+                    {savedAction.notes && <p className="text-sm text-warning-800">{savedAction.notes}</p>}
                     <div className="mt-2">
                       <Button size="compact" variant="secondary" onClick={handleCompleteAction} disabled={loading} className="bg-white hover:bg-success-50 hover:text-success-700 hover:border-success-200 transition-colors">
                         <CheckCircle size={14} className="mr-1" /> Mark as Done
