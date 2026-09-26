@@ -24,7 +24,7 @@ function nextInvoiceNumber(existing: { invoice_number?: string }[], prefix: stri
 const EMPTY_LINE: LineItem = { description: '', qty: 1, unit_price: 0 }
 
 function fmt(amount: number, currency: string) {
-  if (currency === 'BDT') return `৳${amount.toLocaleString('en-BD')}`
+  if (currency === 'BDT') return `৳${amount.toLocaleString('en-IN')}`
   if (currency === 'AUD') return `A$${amount.toLocaleString()}`
   return `$${amount.toLocaleString()}`
 }
@@ -126,10 +126,9 @@ export default function InvoicesPage() {
     setModalOpen(true)
   }
 
-  function calcTotal(items: LineItem[], taxRate: number, discount: number) {
+  function calcTotal(items: LineItem[], discount: number) {
     const subtotal = items.reduce((s, i) => s + (i.qty * i.unit_price), 0)
-    const tax = subtotal * (taxRate / 100)
-    return Math.max(0, subtotal + tax - discount)
+    return Math.max(0, subtotal - discount)
   }
 
   function updateLine(idx: number, field: keyof LineItem, value: string | number) {
@@ -151,7 +150,7 @@ export default function InvoicesPage() {
     if (!form.lead_id) { toast.error('Choose the client (lead) this invoice is for.'); return }
     if (!form.invoice_number?.trim()) { toast.error('Enter an invoice number.'); return }
     if (saving) return
-    const total = calcTotal(form.line_items, Number(form.tax_rate), Number(form.discount_amount))
+    const total = calcTotal(form.line_items, Number(form.discount_amount))
     const payload: any = {
       lead_id: form.lead_id, invoice_number: form.invoice_number,
       amount: total, currency: form.currency, type: form.type,
@@ -198,8 +197,14 @@ export default function InvoicesPage() {
 
   const statuses = ['all', 'draft', 'sent', 'paid', 'overdue', 'cancelled']
   const filtered = filterStatus === 'all' ? invoices : invoices.filter((i: any) => i.status === filterStatus)
-  const totalPaid = invoices.filter((i: any) => i.status === 'paid').reduce((s: number, i: any) => s + Number(i.amount), 0)
-  const totalOutstanding = invoices.filter((i: any) => i.status === 'sent').reduce((s: number, i: any) => s + Number(i.amount), 0)
+
+  // Calculate totals per currency
+  const currencies = ['BDT', 'USD', 'AUD']
+  const totals = currencies.map(cur => {
+    const paid = invoices.filter((i: any) => i.status === 'paid' && i.currency === cur).reduce((s: number, i: any) => s + Number(i.amount), 0)
+    const out = invoices.filter((i: any) => ['sent', 'overdue'].includes(i.status) && i.currency === cur).reduce((s: number, i: any) => s + Number(i.amount), 0)
+    return { currency: cur, paid, out }
+  }).filter(t => t.paid > 0 || t.out > 0) // only show active currencies
 
   return (
     <div className="flex flex-col max-w-5xl gap-6">
@@ -215,16 +220,22 @@ export default function InvoicesPage() {
 
       {/* Summary strip */}
       <div className="grid grid-cols-3 gap-4">
-        {[
-          { label: 'Total Collected', value: fmt(totalPaid, 'BDT'), color: 'text-success-700' },
-          { label: 'Outstanding', value: fmt(totalOutstanding, 'BDT'), color: 'text-warning-700' },
-          { label: 'Total Invoices', value: String(invoices.length), color: 'text-neutral-900' },
-        ].map(s => (
-          <div key={s.label} className="bg-neutral-0 border border-neutral-100 rounded-[16px] px-5 py-4">
-            <p className="text-[10px] font-bold uppercase tracking-[0.04em] text-neutral-400 mb-1">{s.label}</p>
-            <p className={`text-xl font-semibold tabular-nums ${s.color}`}>{s.value}</p>
-          </div>
-        ))}
+        <div className="bg-neutral-0 border border-neutral-100 rounded-[16px] px-5 py-4">
+          <p className="text-[10px] font-bold uppercase tracking-[0.04em] text-neutral-400 mb-1">Total Collected</p>
+          {totals.length > 0 ? totals.map(t => (
+            <p key={t.currency} className="text-lg font-semibold tabular-nums text-success-700">{fmt(t.paid, t.currency)}</p>
+          )) : <p className="text-lg font-semibold tabular-nums text-success-700">{fmt(0, 'BDT')}</p>}
+        </div>
+        <div className="bg-neutral-0 border border-neutral-100 rounded-[16px] px-5 py-4">
+          <p className="text-[10px] font-bold uppercase tracking-[0.04em] text-neutral-400 mb-1">Outstanding</p>
+          {totals.length > 0 ? totals.map(t => (
+            <p key={t.currency} className="text-lg font-semibold tabular-nums text-warning-700">{fmt(t.out, t.currency)}</p>
+          )) : <p className="text-lg font-semibold tabular-nums text-warning-700">{fmt(0, 'BDT')}</p>}
+        </div>
+        <div className="bg-neutral-0 border border-neutral-100 rounded-[16px] px-5 py-4">
+          <p className="text-[10px] font-bold uppercase tracking-[0.04em] text-neutral-400 mb-1">Total Invoices</p>
+          <p className="text-xl font-semibold tabular-nums text-neutral-900">{invoices.length}</p>
+        </div>
       </div>
 
       {/* Status filter */}
@@ -358,13 +369,11 @@ export default function InvoicesPage() {
           <div className="bg-neutral-50 rounded-lg px-4 py-3 text-sm">
             {(() => {
               const sub = form.line_items.reduce((s: number, i: LineItem) => s + i.qty * i.unit_price, 0)
-              const tax = sub * (Number(form.tax_rate) / 100)
-              const total = Math.max(0, sub + tax - Number(form.discount_amount))
+              const total = Math.max(0, sub - Number(form.discount_amount))
               const cur = form.currency
               return (
                 <div className="space-y-1">
                   <div className="flex justify-between text-neutral-600"><span>Subtotal</span><span className="tabular-nums">{fmt(sub, cur)}</span></div>
-                  {Number(form.tax_rate) > 0 && <div className="flex justify-between text-neutral-600"><span>Tax ({form.tax_rate}%)</span><span className="tabular-nums">{fmt(tax, cur)}</span></div>}
                   {Number(form.discount_amount) > 0 && <div className="flex justify-between text-neutral-600"><span>Discount</span><span className="tabular-nums">−{fmt(Number(form.discount_amount), cur)}</span></div>}
                   <div className="flex justify-between font-bold text-neutral-900 pt-1 border-t border-neutral-200"><span>Total</span><span className="tabular-nums">{fmt(total, cur)}</span></div>
                 </div>
@@ -372,8 +381,7 @@ export default function InvoicesPage() {
             })()}
           </div>
 
-          <div className="grid grid-cols-3 gap-3">
-            <Input label="Tax Rate (%)" type="number" value={form.tax_rate} onChange={e => setForm({...form, tax_rate: e.target.value})} />
+          <div className="grid grid-cols-2 gap-3">
             <Input label="Discount (flat)" type="number" value={form.discount_amount} onChange={e => setForm({...form, discount_amount: e.target.value})} />
             <Select label="Currency" value={form.currency} onChange={e => setForm({...form, currency: e.target.value})}>
               <option value="BDT">BDT (৳)</option>

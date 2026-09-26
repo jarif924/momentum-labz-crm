@@ -11,7 +11,7 @@ import {
 import Link from 'next/link'
 
 function fmt(amount: number, currency: string) {
-  if (currency === 'BDT') return `৳${amount.toLocaleString('en-BD')}`
+  if (currency === 'BDT') return `৳${amount.toLocaleString('en-IN')}`
   if (currency === 'AUD') return `A$${amount.toLocaleString('en-AU')}`
   return `$${amount.toLocaleString('en-US')}`
 }

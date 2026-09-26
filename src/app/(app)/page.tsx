@@ -100,32 +100,34 @@ export default async function DashboardPage({ searchParams }: { searchParams: { 
   ]);
 
   // Aggregate Data
-  let cashCurrent = 0;
-  let cashPrev = 0;
+  const cashCurrent: Record<string, number> = {};
+  const cashPrev: Record<string, number> = {};
   if (paidInvoices) {
     paidInvoices.forEach(inv => {
       const dt = new Date(inv.paid_at);
       const val = Number(inv.amount) || 0;
+      const cur = inv.currency || 'BDT';
       if (dt >= new Date(start) && dt <= new Date(end)) {
-        cashCurrent += val;
+        cashCurrent[cur] = (cashCurrent[cur] || 0) + val;
       } else if (dt >= new Date(prevStart) && dt <= new Date(prevEnd)) {
-        cashPrev += val;
+        cashPrev[cur] = (cashPrev[cur] || 0) + val;
       }
     });
   }
-  const cashTrend = cashPrev > 0 ? ((cashCurrent - cashPrev) / cashPrev) * 100 : 0;
+  const cashTrend = cashPrev['BDT'] > 0 ? (( (cashCurrent['BDT']||0) - cashPrev['BDT'] ) / cashPrev['BDT']) * 100 : 0;
 
-  let outstanding = 0;
-  let mrr = 0;
+  const outstanding: Record<string, number> = {};
+  const mrr: Record<string, number> = {};
   if (allInvoices) {
     allInvoices.forEach(inv => {
       const val = Number(inv.amount) || 0;
-      if (inv.status === 'unpaid') outstanding += val;
-      if (inv.type === 'recurring') mrr += val;
+      const cur = inv.currency || 'BDT';
+      if (inv.status === 'sent' || inv.status === 'overdue') outstanding[cur] = (outstanding[cur] || 0) + val;
+      if (inv.is_retainer) mrr[cur] = (mrr[cur] || 0) + val;
     });
   }
 
-  let openPipelineVal = 0;
+  const openPipelineVal: Record<string, number> = {};
   const pipelineCounts: Record<string, number> = {};
   const activeStages = pipelineStages ? pipelineStages.filter(s => !s.is_won && !s.is_lost) : [];
   activeStages.forEach(s => pipelineCounts[s.name] = 0);
@@ -134,7 +136,8 @@ export default async function DashboardPage({ searchParams }: { searchParams: { 
     const wonLostStages = pipelineStages.filter(s => s.is_won || s.is_lost).map(s => s.name);
     openPipelineData.forEach(l => {
       if (!wonLostStages.includes(l.stage)) {
-        openPipelineVal += Number(l.deal_value) || 0;
+        const cur = l.currency || 'BDT';
+        openPipelineVal[cur] = (openPipelineVal[cur] || 0) + (Number(l.deal_value) || 0);
         if (pipelineCounts[l.stage] !== undefined) pipelineCounts[l.stage]++;
       }
     });
@@ -150,7 +153,20 @@ export default async function DashboardPage({ searchParams }: { searchParams: { 
     };
   });
 
-  const formatCurrency = (val: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(val);
+  const formatCurrency = (val: number, cur: string = 'BDT') => {
+    if (cur === 'BDT') return `৳${val.toLocaleString('en-IN')}`;
+    if (cur === 'AUD') return `A$${val.toLocaleString()}`;
+    return `$${val.toLocaleString()}`;
+  };
+
+  const renderCurrencies = (record: Record<string, number>) => {
+    const entries = Object.entries(record).filter(([_, v]) => v > 0);
+    if (entries.length === 0) return <div className="text-2xl font-semibold text-neutral-900">{formatCurrency(0, 'BDT')}</div>;
+    return entries.map(([cur, val]) => (
+      <div key={cur} className="text-2xl font-semibold text-neutral-900 leading-tight">{formatCurrency(val, cur)}</div>
+    ));
+  };
+
   const formatStage = (s: string) => s.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
 
   const pipelineMax = Math.max(...Object.values(pipelineCounts), 1);
@@ -209,7 +225,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: { 
             <span className="text-xs font-bold uppercase tracking-wider text-neutral-400">Cash Collected</span>
             <DollarSign size={16} className="text-success-500" />
           </div>
-          <div className="text-2xl font-semibold text-neutral-900">{formatCurrency(cashCurrent)}</div>
+          <div className="text-2xl font-semibold text-neutral-900">{renderCurrencies(cashCurrent)}</div>
           <div className={`text-xs mt-1 ${cashTrend >= 0 ? 'text-success-600' : 'text-danger-600'}`}>
             {cashTrend > 0 ? '+' : ''}{cashTrend.toFixed(1)}% vs prev period
           </div>
@@ -220,7 +236,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: { 
             <span className="text-xs font-bold uppercase tracking-wider text-neutral-400">Outstanding</span>
             <AlertCircle size={16} className="text-danger-500" />
           </div>
-          <div className="text-2xl font-semibold text-neutral-900">{formatCurrency(outstanding)}</div>
+          <div className="text-2xl font-semibold text-neutral-900">{renderCurrencies(outstanding)}</div>
           <div className="text-xs mt-1 text-neutral-500">Unpaid invoices</div>
         </div>
 
@@ -229,7 +245,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: { 
             <span className="text-xs font-bold uppercase tracking-wider text-neutral-400">MRR</span>
             <TrendingUp size={16} className="text-accent-500" />
           </div>
-          <div className="text-2xl font-semibold text-neutral-900">{formatCurrency(mrr)}</div>
+          <div className="text-2xl font-semibold text-neutral-900">{renderCurrencies(mrr)}</div>
           <div className="text-xs mt-1 text-neutral-500">Monthly recurring</div>
         </div>
 
@@ -238,7 +254,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: { 
             <span className="text-xs font-bold uppercase tracking-wider text-neutral-400">Open Pipeline</span>
             <Target size={16} className="text-primary-500" />
           </div>
-          <div className="text-2xl font-semibold text-neutral-900">{formatCurrency(openPipelineVal)}</div>
+          <div className="text-2xl font-semibold text-neutral-900">{renderCurrencies(openPipelineVal)}</div>
           <div className="text-xs mt-1 text-neutral-500">Active deal value</div>
         </div>
       </div>
