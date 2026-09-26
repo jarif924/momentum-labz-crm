@@ -8,8 +8,12 @@ import { friendlyError } from '@/lib/errors'
 type Line = { description?: string; qty?: number; quantity?: number; unit_price?: number }
 type Company = { name?: string; email?: string; phone?: string; address?: string; website?: string; tax_id?: string }
 
-const money = (amount: number, currency: string) =>
-  new Intl.NumberFormat('en-US', { style: 'currency', currency: currency || 'BDT', currencyDisplay: 'narrowSymbol', maximumFractionDigits: 2 }).format(amount || 0)
+const money = (amount: number, currency: string) => {
+  const amt = amount || 0;
+  if (currency === 'BDT') return `৳${amt.toLocaleString('en-IN')}`;
+  if (currency === 'AUD') return `A$${amt.toLocaleString()}`;
+  return `$${amt.toLocaleString()}`;
+}
 
 const label = 'text-micro text-neutral-400'
 
@@ -55,10 +59,8 @@ export default function InvoicePrintPage() {
   const hasItems = items.length > 0
   // Same formula as the Invoices form: subtotal + tax - flat discount
   const subtotal = hasItems ? items.reduce((s, l) => s + l.qty * l.unit, 0) : Number(invoice.amount)
-  const taxRate = Number(invoice.tax_rate) || 0
-  const tax = hasItems ? subtotal * (taxRate / 100) : 0
   const discount = hasItems ? Number(invoice.discount_amount) || 0 : 0
-  const total = hasItems ? Math.max(0, subtotal + tax - discount) : Number(invoice.amount)
+  const total = hasItems ? Math.max(0, subtotal - discount) : Number(invoice.amount)
   const date = (d: string) => new Date(d).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
 
   return (
@@ -135,7 +137,6 @@ export default function InvoicePrintPage() {
         </div>
         <div className="w-full max-w-xs">
           <Row name="Subtotal" value={money(subtotal, cur)} />
-          {tax > 0 && <Row name={`Tax (${taxRate}%)`} value={money(tax, cur)} />}
           {discount > 0 && <Row name="Discount" value={`−${money(discount, cur)}`} />}
           <div className="flex justify-between border-b-2 border-neutral-900 py-3">
             <span className="text-h3 text-neutral-900">Total due</span>
