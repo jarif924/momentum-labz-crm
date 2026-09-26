@@ -7,6 +7,8 @@ import { Search, Bell, ChevronDown, LogOut, User, Settings, ArrowRight } from 'l
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
+import { useToast } from '@/components/ui/Toast'
+import { friendlyError } from '@/lib/errors'
 
 export function Topbar() {
   const [profileOpen, setProfileOpen] = useState(false)
@@ -14,6 +16,7 @@ export function Topbar() {
   const [notifications, setNotifications] = useState<any[]>([])
   const router = useRouter()
   const supabase = createClient()
+  const toast = useToast()
 
   useEffect(() => {
     async function fetchNotifs() {
@@ -26,14 +29,26 @@ export function Topbar() {
     }
     fetchNotifs()
 
-    // Setup realtime listener
-    const channel = supabase.channel('notifs')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notifications' }, payload => {
-        setNotifications(prev => [payload.new, ...prev].slice(0, 10))
-      })
-      .subscribe()
+    let channel: ReturnType<typeof supabase.channel> | null = null
+    let cancelled = false
+    async function subscribe() {
+      // Join with the user's token, or RLS treats the subscriber as anonymous and filters every event out
+      const { data: { session } } = await supabase.auth.getSession()
+      if (cancelled || !session) return
+      supabase.realtime.setAuth(session.access_token)
+      // Unique topic per mount: a shared name lets the previous mount's leave cancel this subscription
+      channel = supabase.channel(`notifs-${Math.random().toString(36).slice(2)}`)
+        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notifications' }, payload => {
+          setNotifications(prev => [payload.new, ...prev].slice(0, 10))
+        })
+        .subscribe()
+    }
+    subscribe()
 
-    return () => { supabase.removeChannel(channel) }
+    return () => {
+      cancelled = true
+      if (channel) supabase.removeChannel(channel)
+    }
   }, [supabase])
 
   const unreadCount = notifications.filter(n => !n.is_read).length
@@ -45,12 +60,14 @@ export function Topbar() {
   }
 
   async function markAsRead(id: string) {
-    await supabase.from('notifications').update({ is_read: true }).eq('id', id)
+    const { error } = await supabase.from('notifications').update({ is_read: true }).eq('id', id)
+    if (error) { toast.error(`Couldn't update notification: ${friendlyError(error)}`); return }
     setNotifications(prev => prev.map(n => n.id === id ? { ...n, is_read: true } : n))
   }
 
   async function markAllAsRead() {
-    await supabase.from('notifications').update({ is_read: true }).eq('is_read', false)
+    const { error } = await supabase.from('notifications').update({ is_read: true }).eq('is_read', false)
+    if (error) { toast.error(`Couldn't update notifications: ${friendlyError(error)}`); return }
     setNotifications(prev => prev.map(n => ({ ...n, is_read: true })))
   }
 
