@@ -152,3 +152,12 @@
     letter-spacing: 0.04em;
   }
 }
+
+/* Toast enter: 200ms ease-out, 4px upward slide + fade (design system §9) */
+@keyframes toast-enter {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.toast-enter {
+  animation: toast-enter 200ms ease-out;
+}

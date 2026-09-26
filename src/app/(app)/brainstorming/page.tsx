@@ -6,6 +6,8 @@ import { createBrowserClient } from '@supabase/ssr';
 import { Database } from '@/types/supabase';
 import { Button } from '@/components/ui/Forms';
 import { Plus, Trash2, Save, FileText, CheckCircle, Lightbulb } from 'lucide-react';
+import { useToast } from '@/components/ui/Toast';
+import { friendlyError } from '@/lib/errors';
 
 export default function BrainstormingPage() {
   const supabase = createBrowserClient<Database>(
@@ -17,6 +19,8 @@ export default function BrainstormingPage() {
   const [activeNote, setActiveNote] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const toast = useToast();
 
   useEffect(() => {
     fetchNotes();
@@ -25,11 +29,12 @@ export default function BrainstormingPage() {
 
   async function fetchNotes() {
     setLoading(true);
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('brainstorm_notes')
       .select('*')
       .order('updated_at', { ascending: false });
-    
+
+    if (error) toast.error(`Couldn't load ideas: ${friendlyError(error)}`);
     if (data) {
       setNotes(data);
       if (data.length > 0 && !activeNote) {
@@ -40,7 +45,9 @@ export default function BrainstormingPage() {
   }
 
   async function createNewNote() {
-    const { data } = await supabase
+    if (creating) return;
+    setCreating(true);
+    const { data, error } = await supabase
       .from('brainstorm_notes')
       .insert({
         title: 'Untitled Idea',
@@ -49,17 +56,20 @@ export default function BrainstormingPage() {
       })
       .select()
       .single();
-    
-    if (data) {
-      setNotes([data, ...notes]);
-      setActiveNote(data);
+    setCreating(false);
+
+    if (error || !data) {
+      toast.error(`Couldn't create idea: ${friendlyError(error)}`);
+      return;
     }
+    setNotes([data, ...notes]);
+    setActiveNote(data);
   }
 
   async function saveActiveNote() {
     if (!activeNote) return;
     setSaving(true);
-    await supabase
+    const { error } = await supabase
       .from('brainstorm_notes')
       .update({
         title: activeNote.title,
@@ -67,7 +77,12 @@ export default function BrainstormingPage() {
         status: activeNote.status
       })
       .eq('id', activeNote.id);
-    
+
+    if (error) {
+      setSaving(false);
+      toast.error(`Couldn't save idea: ${friendlyError(error)}`);
+      return;
+    }
     // Update local state without full refetch to avoid losing focus
     setNotes(notes.map(n => n.id === activeNote.id ? activeNote : n));
     setSaving(false);
@@ -75,7 +90,11 @@ export default function BrainstormingPage() {
 
   async function deleteNote(id: string) {
     if (!confirm('Are you sure you want to delete this idea?')) return;
-    await supabase.from('brainstorm_notes').delete().eq('id', id);
+    const { error } = await supabase.from('brainstorm_notes').delete().eq('id', id);
+    if (error) {
+      toast.error(`Couldn't delete idea: ${friendlyError(error)}`);
+      return;
+    }
     if (activeNote?.id === id) {
       setActiveNote(null);
     }
@@ -93,6 +112,8 @@ export default function BrainstormingPage() {
           </h2>
           <button 
             onClick={createNewNote}
+            disabled={creating}
+            aria-label="New idea"
             className="p-1.5 bg-neutral-200/50 hover:bg-neutral-200 text-neutral-600 rounded-md transition-colors"
           >
             <Plus size={16} />

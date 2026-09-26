@@ -2,6 +2,7 @@ export const dynamic = 'force-dynamic'
 
 import { Sidebar } from '@/components/shell/Sidebar'
 import { Topbar } from '@/components/shell/Topbar'
+import { ToastProvider } from '@/components/ui/Toast'
 import { redirect } from 'next/navigation'
 
 export default async function AppLayout({
@@ -18,14 +19,16 @@ export default async function AppLayout({
   }
 
   return (
-    <div className="flex min-h-screen bg-neutral-50">
-      <Sidebar />
-      <div className="flex flex-col flex-1 min-w-0">
-        <Topbar />
-        <main className="flex-1 p-6 overflow-auto">
-          {children}
-        </main>
+    <ToastProvider>
+      <div className="flex min-h-screen bg-neutral-50">
+        <Sidebar />
+        <div className="flex flex-col flex-1 min-w-0">
+          <Topbar />
+          <main className="flex-1 p-6 overflow-auto">
+            {children}
+          </main>
+        </div>
       </div>
-    </div>
+    </ToastProvider>
   )
 }

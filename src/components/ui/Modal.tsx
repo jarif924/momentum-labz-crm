@@ -1,4 +1,4 @@
-import { ReactNode } from 'react';
+import { ReactNode, useEffect } from 'react';
 import { X } from 'lucide-react';
 
 interface ModalProps {
@@ -10,6 +10,13 @@ interface ModalProps {
 }
 
 export function Modal({ isOpen, onClose, title, children, maxWidth = 'md' }: ModalProps) {
+  useEffect(() => {
+    if (!isOpen) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [isOpen, onClose]);
+
   if (!isOpen) return null;
 
   const maxWidthClass = {
@@ -32,8 +39,9 @@ export function Modal({ isOpen, onClose, title, children, maxWidth = 'md' }: Mod
       <div className={`relative w-full ${maxWidthClass} bg-neutral-0 rounded-[16px] shadow-lg border border-neutral-100 flex flex-col max-h-[90vh]`}>
         <div className="flex items-center justify-between px-6 py-4 border-b border-neutral-100">
           <h2 className="text-lg font-semibold text-neutral-900">{title}</h2>
-          <button 
+          <button
             onClick={onClose}
+            aria-label="Close"
             className="p-1 text-neutral-400 hover:text-neutral-900 hover:bg-neutral-100 transition-colors rounded-md"
           >
             <X size={20} strokeWidth={1.75} />

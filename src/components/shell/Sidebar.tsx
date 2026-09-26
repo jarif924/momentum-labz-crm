@@ -144,7 +144,7 @@ export function Sidebar() {
       {/* Nav groups */}
       <nav className="flex-1 overflow-y-auto px-3 py-4">
         {NAV_GROUPS.map((group, groupIdx) => (
-          <div key={group.label} className={groupIdx > 0 ? 'mt-6' : ''}>
+          <div key={`${group.label}-${groupIdx}`} className={groupIdx > 0 ? 'mt-6' : ''}>
             {/* Section 7.2: micro uppercase label in neutral-400 */}
             <p className="text-micro text-neutral-400 px-3 mb-2">
               {group.label}
