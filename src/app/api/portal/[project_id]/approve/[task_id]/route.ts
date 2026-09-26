@@ -5,6 +5,11 @@ export async function POST(
   request: Request,
   { params }: { params: { project_id: string; task_id: string } }
 ) {
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+  if (!uuidRegex.test(params.project_id) || !uuidRegex.test(params.task_id)) {
+    return NextResponse.json({ error: 'Invalid ID format' }, { status: 400 });
+  }
+
   let dbClient: Client | null = null;
   
   try {

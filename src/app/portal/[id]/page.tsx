@@ -19,7 +19,9 @@ export default async function ClientPortalPage({ params }: { params: { id: strin
     await dbClient.connect();
 
     const projectRes = await dbClient.query(`
-      SELECT p.*, c.name as company_name, lc.full_name as client_name, l.currency
+      SELECT p.id, p.name, p.status, p.target_date, p.total_ad_spend, p.leads_generated, p.cpl, 
+             p.roas, p.staging_url, p.production_url, p.repository_url, p.currency,
+             c.name as company_name, lc.full_name as client_name, l.currency as lead_currency
       FROM projects p
       LEFT JOIN companies c ON p.company_id = c.id
       LEFT JOIN leads l ON p.lead_id = l.id
@@ -31,9 +33,11 @@ export default async function ClientPortalPage({ params }: { params: { id: strin
       return notFound();
     }
     project = projectRes.rows[0];
+    if (!project.currency) project.currency = project.lead_currency; // fallback
 
     const tasksRes = await dbClient.query(`
-      SELECT * FROM tasks 
+      SELECT id, title, description, completed, loom_url, requires_client_approval 
+      FROM tasks 
       WHERE project_id = $1 AND is_client_visible = true 
       ORDER BY sort_order ASC, created_at ASC
     `, [params.id]);
