@@ -7,6 +7,8 @@ import { Database } from '@/types/supabase'
 import { Plus, Edit2, Trash2, ArrowDownLeft } from 'lucide-react'
 import { Button, Input, Select } from '@/components/ui/Forms'
 import { Modal } from '@/components/ui/Modal'
+import { useToast } from '@/components/ui/Toast'
+import { friendlyError } from '@/lib/errors'
 
 const CATEGORIES = [
   { value: 'tools', label: 'Tools & Subscriptions' },
@@ -45,6 +47,8 @@ export default function ExpensesPage() {
   const [editing, setEditing] = useState<any>(null)
   const [form, setForm] = useState<any>(EMPTY_FORM)
   const [filterCat, setFilterCat] = useState('all')
+  const [saving, setSaving] = useState(false)
+  const toast = useToast()
 
   useEffect(() => { fetchData() /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [])
 
@@ -54,6 +58,7 @@ export default function ExpensesPage() {
       (supabase.from('expenses') as any).select('*, leads(contacts(full_name))').order('date', { ascending: false }),
       supabase.from('leads').select('id, contacts(full_name)')
     ])
+    if (expRes.error || leadRes.error) toast.error(`Couldn't load expenses: ${friendlyError(expRes.error || leadRes.error)}`)
     if (expRes.data) setExpenses(expRes.data)
     if (leadRes.data) setLeads(leadRes.data as any)
     setLoading(false)
@@ -71,7 +76,9 @@ export default function ExpensesPage() {
   }
 
   async function handleSave() {
-    if (!form.description || !form.amount) return
+    if (!form.description?.trim()) { toast.error('Enter a description.'); return }
+    if (!Number.isFinite(parseFloat(form.amount))) { toast.error('Enter the amount.'); return }
+    if (saving) return
     const payload = {
       date: form.date, description: form.description,
       amount: parseFloat(form.amount), currency: form.currency,
@@ -79,18 +86,28 @@ export default function ExpensesPage() {
       payment_method: form.payment_method, notes: form.notes || null,
       is_billable: form.is_billable, lead_id: form.lead_id || null
     }
-    if (editing) {
-      await (supabase.from('expenses') as any).update(payload).eq('id', editing.id)
-    } else {
-      await (supabase.from('expenses') as any).insert(payload)
+    setSaving(true)
+    const { error } = editing
+      ? await (supabase.from('expenses') as any).update(payload).eq('id', editing.id)
+      : await (supabase.from('expenses') as any).insert(payload)
+    setSaving(false)
+    if (error) {
+      toast.error(`Couldn't save expense: ${friendlyError(error)}`)
+      return
     }
+    toast.success(editing ? 'Expense updated' : 'Expense added')
     setModalOpen(false)
     fetchData()
   }
 
   async function handleDelete(id: string) {
     if (!confirm('Delete this expense?')) return
-    await (supabase.from('expenses') as any).delete().eq('id', id)
+    const { error } = await (supabase.from('expenses') as any).delete().eq('id', id)
+    if (error) {
+      toast.error(`Couldn't delete expense: ${friendlyError(error)}`)
+      return
+    }
+    toast.success('Expense deleted')
     fetchData()
   }
 
@@ -219,7 +236,7 @@ export default function ExpensesPage() {
           </label>
           <div className="flex justify-end gap-3 pt-3 border-t border-neutral-100">
             <Button variant="secondary" onClick={() => setModalOpen(false)}>Cancel</Button>
-            <Button onClick={handleSave} disabled={!form.description || !form.amount}>Save Expense</Button>
+            <Button onClick={handleSave} disabled={!form.description || !form.amount || saving}>{saving ? 'Saving…' : 'Save Expense'}</Button>
           </div>
         </div>
       </Modal>
