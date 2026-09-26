@@ -7,6 +7,8 @@ import { Database } from '@/types/supabase';
 import { Button, Input, Select } from '@/components/ui/Forms';
 import { Modal } from '@/components/ui/Modal';
 import { Plus, Edit2, Trash2, FileText, FileSignature, CheckCircle, Clock, X } from 'lucide-react';
+import { useToast } from '@/components/ui/Toast';
+import { friendlyError } from '@/lib/errors';
 
 export default function ProposalsPage() {
   const supabase = createBrowserClient<Database>(
@@ -18,6 +20,8 @@ export default function ProposalsPage() {
   const [ leads, setLeads] = useState<any[]>([]);
   const [ availableServices, setAvailableServices] = useState<string[]>([]);
   const [ loading, setLoading] = useState(true);
+  const [ saving, setSaving] = useState(false);
+  const toast = useToast();
 
   const [ isModalOpen, setIsModalOpen] = useState(false);
   const [ editingProp, setEditingProp] = useState<any>(null);
@@ -44,6 +48,8 @@ export default function ProposalsPage() {
       supabase.from('leads').select('*, contacts(*, companies(*))'),
       supabase.from('system_settings').select('*').single()
     ]);
+    const loadError = propRes.error || leadsRes.error || settingsRes.error;
+    if (loadError) toast.error(`Couldn't load proposals: ${friendlyError(loadError)}`);
     if (propRes.data) setProposals(propRes.data);
     if (leadsRes.data) setLeads(leadsRes.data);
     if (settingsRes.data?.services) setAvailableServices(settingsRes.data.services);
@@ -78,28 +84,48 @@ export default function ProposalsPage() {
   }
 
   async function handleSave() {
+    if (!formData.lead_id) {
+      toast.error('Choose the lead this proposal is for.');
+      return;
+    }
+    const amount = parseFloat(formData.amount);
+    if (!Number.isFinite(amount) || amount < 0) {
+      toast.error('Enter the proposal amount.');
+      return;
+    }
+    if (saving) return;
     const payload = {
       lead_id: formData.lead_id,
-      amount: parseFloat(formData.amount),
+      amount,
       currency: formData.currency,
       services: formData.services,
       status: formData.status,
-      document_url: formData.document_url,
-      notes: formData.notes
+      document_url: formData.document_url || null,
+      notes: formData.notes || null
     };
 
-    if (editingProp) {
-      await supabase.from('proposals').update(payload).eq('id', editingProp.id);
-    } else {
-      await supabase.from('proposals').insert(payload);
+    setSaving(true);
+    const { error } = editingProp
+      ? await supabase.from('proposals').update(payload).eq('id', editingProp.id)
+      : await supabase.from('proposals').insert(payload);
+    setSaving(false);
+    if (error) {
+      toast.error(`Couldn't save proposal: ${friendlyError(error)}`);
+      return;
     }
+    toast.success(editingProp ? 'Proposal updated' : 'Proposal created');
     setIsModalOpen(false);
     fetchData();
   }
 
   async function handleDelete(id: string) {
     if (confirm('Delete this proposal?')) {
-      await supabase.from('proposals').delete().eq('id', id);
+      const { error } = await supabase.from('proposals').delete().eq('id', id);
+      if (error) {
+        toast.error(`Couldn't delete proposal: ${friendlyError(error)}`);
+        return;
+      }
+      toast.success('Proposal deleted');
       fetchData();
     }
   }
@@ -296,8 +322,8 @@ export default function ProposalsPage() {
 
           <div className="flex justify-end gap-3 mt-2 pt-4 border-t border-neutral-100">
             <Button variant="secondary" onClick={() => setIsModalOpen(false)}>Discard</Button>
-            <Button onClick={handleSave} disabled={!formData.lead_id || !formData.amount}>
-              {editingProp ? 'Update Proposal' : 'Finalize & Save'}
+            <Button onClick={handleSave} disabled={!formData.lead_id || !formData.amount || saving}>
+              {saving ? 'Saving…' : editingProp ? 'Update Proposal' : 'Finalize & Save'}
             </Button>
           </div>
         </div>
