@@ -5,7 +5,7 @@ import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import {
   Briefcase, Building2, CircleUser, Coins, Columns3, Megaphone, Receipt, SlidersHorizontal, Tag, Users, type LucideIcon,
 } from 'lucide-react'
-import { TeamManager } from './_components/legacy'
+import { AccountSection, TeamSection } from './_components/PeopleSections'
 import { CustomFieldsSection } from './_components/CustomFieldsSection'
 import { CompanySection, CurrencySection, InvoicingSection } from './_components/FormSections'
 import { LeadSourcesSection, ServicesSection, TagsSection } from './_components/ListSections'
@@ -47,7 +47,8 @@ const GROUPS: { label: string; items: { id: SectionId; label: string; icon: Luci
 // Sections are added here as they are built; the menu only shows these.
 const SECTIONS: Partial<Record<SectionId, ComponentType>> = {
   company: CompanySection,
-  team: TeamManager,
+  team: TeamSection,
+  account: AccountSection,
   pipeline: PipelineSection,
   sources: LeadSourcesSection,
   services: ServicesSection,

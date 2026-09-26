@@ -10,7 +10,23 @@ import Link from 'next/link'
 import { useToast } from '@/components/ui/Toast'
 import { friendlyError } from '@/lib/errors'
 
+const ROLE_LABELS: Record<string, string> = { owner: 'Owner', admin: 'Admin', sales: 'Sales', viewer: 'Viewer' }
+
 export function Topbar() {
+  const [profile, setProfile] = useState<{ full_name: string; role: string | null } | null>(null)
+
+  // Signed-in person's name and role; refreshed when they rename themselves in My account
+  useEffect(() => {
+    const load = () => fetch('/api/team/me')
+      .then(r => (r.ok && r.headers.get('content-type')?.includes('application/json') ? r.json() : null))
+      .then(p => { if (p) setProfile({ full_name: p.full_name, role: p.role }) })
+      .catch(() => {})
+    load()
+    window.addEventListener('profile-updated', load)
+    return () => window.removeEventListener('profile-updated', load)
+  }, [])
+  const profileInitials = (profile?.full_name ?? '').split(/\s+/).filter(Boolean).slice(0, 2).map(p => p[0]!.toUpperCase()).join('')
+
   const [profileOpen, setProfileOpen] = useState(false)
   const [notifOpen, setNotifOpen] = useState(false)
   const [notifications, setNotifications] = useState<any[]>([])
@@ -149,11 +165,11 @@ export function Topbar() {
             className="flex items-center gap-2 h-10 px-2 rounded-md hover:bg-neutral-50 transition-colors"
           >
             <div className="w-8 h-8 rounded-full bg-neutral-100 flex items-center justify-center shrink-0">
-              <span className="text-[10px] text-neutral-600 font-bold tracking-wider">FJ</span>
+              <span className="text-[10px] text-neutral-600 font-bold tracking-wider">{profileInitials}</span>
             </div>
             <div className="hidden sm:block text-left">
-              <p className="text-[13px] font-medium text-neutral-900 leading-none">Fatin Jarif</p>
-              <p className="text-[11px] text-neutral-400 mt-0.5">Owner</p>
+              <p className="text-[13px] font-medium text-neutral-900 leading-none">{profile?.full_name ?? ''}</p>
+              <p className="text-[11px] text-neutral-400 mt-0.5">{profile ? ROLE_LABELS[profile.role ?? ''] ?? 'Not on team' : ''}</p>
             </div>
             <ChevronDown size={16} className={`text-neutral-400 transition-transform ${profileOpen ? 'rotate-180' : ''}`} />
           </button>
