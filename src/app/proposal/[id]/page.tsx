@@ -1,11 +1,12 @@
-import { createClient } from '@supabase/supabase-js'
 import { notFound } from 'next/navigation'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { ClientProposalView } from './ClientProposalView'
 
+// Clients must always see the current version and acceptance status
+export const dynamic = 'force-dynamic'
+
 export default async function PublicProposalPage({ params }: { params: { id: string } }) {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
-  const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || ''
-  const supabase = createClient(supabaseUrl, supabaseServiceKey)
+  const supabase = createAdminClient()
 
   const { data: proposal, error } = await supabase
     .from('proposals')

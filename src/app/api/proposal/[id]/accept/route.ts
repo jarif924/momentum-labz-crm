@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
-import { createClient, type SupabaseClient } from '@supabase/supabase-js'
+import type { SupabaseClient } from '@supabase/supabase-js'
+import { createAdminClient } from '@/lib/supabase/admin'
 
 // Same numbering as the Invoices page: prefix (+ year) + next number after the highest existing one
 async function nextInvoiceNumber(supabase: SupabaseClient) {
@@ -15,7 +16,7 @@ async function nextInvoiceNumber(supabase: SupabaseClient) {
 }
 
 export async function POST(req: Request, { params }: { params: { id: string } }) {
-  const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL || '', process.env.SUPABASE_SERVICE_ROLE_KEY || '')
+  const supabase = createAdminClient()
 
   try {
     const body = await req.json().catch(() => ({}))
