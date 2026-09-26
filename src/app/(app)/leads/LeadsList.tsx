@@ -96,6 +96,8 @@ export function LeadsList({ leads, onEdit, onRowClick, selectedIds, onToggleSele
                 <td className="p-3 text-right">
                   <button 
                     onClick={(e) => { e.stopPropagation(); onEdit(lead); }}
+                    aria-label="Edit lead"
+                    title="Edit lead"
                     className="p-1.5 text-neutral-400 opacity-0 group-hover:opacity-100 hover:text-neutral-900 hover:bg-neutral-200 rounded-md transition-all"
                   >
                     <Edit2 size={14} />
