@@ -1,0 +1,14 @@
+name: Daily CRM Reminders
+
+on:
+  schedule:
+    - cron: '0 2 * * *' # Runs at 2:00 AM UTC every day
+  workflow_dispatch: # Allows manual trigger
+
+jobs:
+  ping-reminders:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Reminders API
+        run: |
+          curl -s -o /dev/null -w "%{http_code}" -X GET "https://momentum-labz-crm.pages.dev/api/cron/reminders?secret=${{ secrets.CRON_SECRET }}"
