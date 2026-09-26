@@ -6,6 +6,8 @@ import { createBrowserClient } from '@supabase/ssr'
 import { Database } from '@/types/supabase'
 import { ChevronLeft, Link as LinkIcon, Eye, CheckCircle2, ArrowUpRight } from 'lucide-react'
 import Link from 'next/link'
+import { useToast } from '@/components/ui/Toast'
+import { friendlyError } from '@/lib/errors'
 
 export default function ProjectDetailPage({ params }: { params: { id: string } }) {
   const supabase = createBrowserClient<Database>(
@@ -17,6 +19,7 @@ export default function ProjectDetailPage({ params }: { params: { id: string } }
   const [tasks, setTasks] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [copiedLink, setCopiedLink] = useState(false)
+  const toast = useToast()
 
   useEffect(() => {
     fetchProjectData()
@@ -29,6 +32,9 @@ export default function ProjectDetailPage({ params }: { params: { id: string } }
       (supabase.from('projects') as any).select('*, companies(name), leads(contacts(full_name))').eq('id', params.id).single(),
       supabase.from('tasks').select('*').eq('project_id', params.id).order('sort_order', { ascending: true })
     ])
+    // PGRST116 = no row, which the "Project not found" state already covers
+    const loadError = (projectRes.error?.code !== 'PGRST116' && projectRes.error) || tasksRes.error
+    if (loadError) toast.error(`Couldn't load project: ${friendlyError(loadError)}`)
     if (projectRes.data) setProject(projectRes.data)
     if (tasksRes.data) setTasks(tasksRes.data)
     setLoading(false)
@@ -39,16 +45,20 @@ export default function ProjectDetailPage({ params }: { params: { id: string } }
     setTasks(prev => prev.map(t => t.id === taskId ? { ...t, [field]: newValue } : t))
     const { error } = await supabase.from('tasks').update({ [field]: newValue } as any).eq('id', taskId)
     if (error) {
-      alert('Failed to update task')
+      toast.error(`Couldn't update task: ${friendlyError(error)}`)
       setTasks(prev => prev.map(t => t.id === taskId ? { ...t, [field]: currentValue } : t))
     }
   }
 
-  function copyPortalLink() {
+  async function copyPortalLink() {
     const url = `${window.location.origin}/portal/${params.id}`
-    navigator.clipboard.writeText(url)
-    setCopiedLink(true)
-    setTimeout(() => setCopiedLink(false), 2500)
+    try {
+      await navigator.clipboard.writeText(url)
+      setCopiedLink(true)
+      setTimeout(() => setCopiedLink(false), 2500)
+    } catch {
+      toast.error(`Couldn't copy automatically. The link is: ${url}`)
+    }
   }
 
   if (loading) return <div className="p-8 text-center text-neutral-500 animate-pulse">Loading project...</div>

@@ -5,6 +5,8 @@ import { createBrowserClient } from '@supabase/ssr'
 import { Database } from '@/types/supabase'
 import Link from 'next/link'
 import { Layers, Calendar, ExternalLink } from 'lucide-react'
+import { useToast } from '@/components/ui/Toast'
+import { friendlyError } from '@/lib/errors'
 
 export default function ProjectsPage() {
   const supabase = createBrowserClient<Database>(
@@ -15,6 +17,7 @@ export default function ProjectsPage() {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [projects, setProjects] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+  const toast = useToast()
 
   useEffect(() => {
     fetchProjects()
@@ -29,7 +32,7 @@ export default function ProjectsPage() {
       .order('created_at', { ascending: false })
 
     if (error) {
-      console.error('Error fetching projects:', error)
+      toast.error(`Couldn't load projects: ${friendlyError(error)}`)
     } else if (data) {
       setProjects(data)
     }
