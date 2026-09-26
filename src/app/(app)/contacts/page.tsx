@@ -7,6 +7,8 @@ import { Database } from '@/types/supabase';
 import { Button, Input, Select } from '@/components/ui/Forms';
 import { Modal } from '@/components/ui/Modal';
 import { Plus, Edit2, Trash2, Users, Building2 } from 'lucide-react';
+import { useToast } from '@/components/ui/Toast';
+import { friendlyError } from '@/lib/errors';
 
 export default function ContactsPage() {
   const supabase = createBrowserClient<Database>(
@@ -15,7 +17,9 @@ export default function ContactsPage() {
   );
 
   const [activeTab, setActiveTab] = useState<'contacts' | 'companies'>('contacts');
-  
+  const toast = useToast();
+  const [saving, setSaving] = useState(false);
+
   const [contacts, setContacts] = useState<any[]>([]);
   const [companies, setCompanies] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -42,11 +46,12 @@ export default function ContactsPage() {
 
   async function fetchData() {
     setLoading(true);
-    const [ { data: cData }, { data: compData } ] = await Promise.all([
+    const [ { data: cData, error: cErr }, { data: compData, error: compErr } ] = await Promise.all([
       supabase.from('contacts').select('*, companies(name)').order('full_name', { ascending: true }),
       supabase.from('companies').select('*').order('name', { ascending: true })
     ]) as any;
 
+    if (cErr || compErr) toast.error(`Couldn't load contacts: ${friendlyError(cErr || compErr)}`);
     if (cData) setContacts(cData);
     if (compData) setCompanies(compData);
     setLoading(false);
@@ -73,24 +78,40 @@ export default function ContactsPage() {
   }
 
   async function saveContact() {
-    if (!contactData.full_name) return;
+    if (!contactData.full_name?.trim()) {
+      toast.error('Enter the contact’s full name.');
+      return;
+    }
+    if (saving) return;
     const payload = {
       ...contactData,
       company_id: contactData.company_id || null
     };
 
-    if (editingContact) {
-      await (supabase.from('contacts') as any).update(payload).eq('id', editingContact.id);
-    } else {
-      await (supabase.from('contacts') as any).insert(payload);
+    setSaving(true);
+    const { error } = editingContact
+      ? await (supabase.from('contacts') as any).update(payload).eq('id', editingContact.id)
+      : await (supabase.from('contacts') as any).insert(payload);
+    setSaving(false);
+    if (error) {
+      toast.error(`Couldn't save contact: ${friendlyError(error)}`);
+      return;
     }
+    toast.success(editingContact ? 'Contact updated' : 'Contact added');
     setIsContactModalOpen(false);
     fetchData();
   }
 
   async function deleteContact(id: string) {
     if (confirm('Delete this contact?')) {
-      await (supabase.from('contacts') as any).delete().eq('id', id);
+      const { error } = await (supabase.from('contacts') as any).delete().eq('id', id);
+      if (error) {
+        toast.error(error.code === '23503'
+          ? 'This contact has leads. Delete or reassign their leads first.'
+          : `Couldn't delete contact: ${friendlyError(error)}`);
+        return;
+      }
+      toast.success('Contact deleted');
       fetchData();
     }
   }
@@ -113,19 +134,33 @@ export default function ContactsPage() {
   }
 
   async function saveCompany() {
-    if (!companyData.name) return;
-    if (editingCompany) {
-      await (supabase.from('companies') as any).update(companyData).eq('id', editingCompany.id);
-    } else {
-      await (supabase.from('companies') as any).insert(companyData);
+    if (!companyData.name?.trim()) {
+      toast.error('Enter the company name.');
+      return;
     }
+    if (saving) return;
+    setSaving(true);
+    const { error } = editingCompany
+      ? await (supabase.from('companies') as any).update(companyData).eq('id', editingCompany.id)
+      : await (supabase.from('companies') as any).insert(companyData);
+    setSaving(false);
+    if (error) {
+      toast.error(`Couldn't save company: ${friendlyError(error)}`);
+      return;
+    }
+    toast.success(editingCompany ? 'Company updated' : 'Company added');
     setIsCompanyModalOpen(false);
     fetchData();
   }
 
   async function deleteCompany(id: string) {
     if (confirm('Delete this company? Linked contacts will lose their company.')) {
-      await (supabase.from('companies') as any).delete().eq('id', id);
+      const { error } = await (supabase.from('companies') as any).delete().eq('id', id);
+      if (error) {
+        toast.error(`Couldn't delete company: ${friendlyError(error)}`);
+        return;
+      }
+      toast.success('Company deleted');
       fetchData();
     }
   }
@@ -245,7 +280,7 @@ export default function ContactsPage() {
           </div>
           <div className="flex justify-end gap-3 mt-4 pt-4 border-t border-neutral-100">
             <Button variant="secondary" onClick={() => setIsContactModalOpen(false)}>Cancel</Button>
-            <Button onClick={saveContact} disabled={!contactData.full_name}>Save</Button>
+            <Button onClick={saveContact} disabled={!contactData.full_name || saving}>{saving ? 'Saving…' : 'Save'}</Button>
           </div>
         </div>
       </Modal>
@@ -264,7 +299,7 @@ export default function ContactsPage() {
           <Input label="Website" type="url" value={companyData.website} onChange={e => setCompanyData({...companyData, website: e.target.value})} placeholder="https://" />
           <div className="flex justify-end gap-3 mt-4 pt-4 border-t border-neutral-100">
             <Button variant="secondary" onClick={() => setIsCompanyModalOpen(false)}>Cancel</Button>
-            <Button onClick={saveCompany} disabled={!companyData.name}>Save</Button>
+            <Button onClick={saveCompany} disabled={!companyData.name || saving}>{saving ? 'Saving…' : 'Save'}</Button>
           </div>
         </div>
       </Modal>
