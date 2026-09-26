@@ -43,7 +43,8 @@ export async function middleware(request: NextRequest) {
   } = await supabase.auth.getUser()
 
   const { pathname } = request.nextUrl
-  const publicPaths = ['/login', '/auth/callback', '/api/leads/ingest', '/api/cron', '/api/debug-env', '/portal']
+  // Client-facing links must open without a CRM login. Trailing slashes keep the internal /proposals page protected.
+  const publicPaths = ['/login', '/auth/callback', '/api/leads/ingest', '/api/cron', '/portal/', '/api/portal/', '/proposal/', '/api/proposal/']
   const isPublicPath = publicPaths.some((p) => pathname.startsWith(p))
 
   if (!user && !isPublicPath) {
