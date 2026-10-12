@@ -200,7 +200,7 @@ begin
 end $$;
 
 -- Private image objects are addressed by note UUID / random filename.
-insert into storage.buckets(id,name,public,file_size_limit,allowed_mime_types) values('brainstorm-images','brainstorm-images',false,5242880,array['image/jpeg','image/png','image/webp','image/gif']);
+insert into storage.buckets(id,name,public,file_size_limit,allowed_mime_types) values('brainstorm-images','brainstorm-images',false,5242880,array['image/jpeg','image/png','image/webp','image/gif']) on conflict(id) do update set public=false,file_size_limit=excluded.file_size_limit,allowed_mime_types=excluded.allowed_mime_types;
 create or replace function public.bn_image_note(object_name text) returns uuid language plpgsql immutable as $$ begin return split_part(object_name,'/',1)::uuid; exception when others then return null; end $$;
 create policy bn_image_read on storage.objects for select to authenticated using(bucket_id='brainstorm-images' and public.bn_can_read(public.bn_image_note(name)));
 create policy bn_image_insert on storage.objects for insert to authenticated with check(bucket_id='brainstorm-images' and public.bn_can_edit(public.bn_image_note(name)) and exists(select 1 from public.brainstorm_locks where note_id=public.bn_image_note(name) and user_id=auth.uid() and expires_at>now()));

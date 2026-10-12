@@ -31,3 +31,26 @@ export async function resolveImage(url: string): Promise<string>{
   const {data,error}=await createClient().storage.from('brainstorm-images').download(url.slice('brainstorm-image:'.length));
   if(error)throw error;return URL.createObjectURL(data);
 }
+
+// A duplicate owns its own image objects, so later visibility changes or deletion
+// of the source cannot break the copy or expose a private source image.
+export async function copyNoteImages(noteId: string,document: unknown[]): Promise<unknown[]> {
+  const replacements=new Map<string,string>();
+  async function visit(value: unknown): Promise<unknown> {
+    if(Array.isArray(value))return Promise.all(value.map(visit));
+    if(!value||typeof value!=='object')return value;
+    const next:Record<string,unknown>={};
+    for(const [key,entry] of Object.entries(value)){
+      if(key==='url'&&typeof entry==='string'&&entry.startsWith('brainstorm-image:')){
+        if(!replacements.has(entry)){
+          const {data,error}=await createClient().storage.from('brainstorm-images').download(entry.slice('brainstorm-image:'.length));
+          if(error||!data)throw error||new Error('Could not copy this image.');
+          replacements.set(entry,await uploadImage(noteId,new File([data],'copied-image',{type:data.type}),()=>{}));
+        }
+        next[key]=replacements.get(entry);
+      }else next[key]=await visit(entry);
+    }
+    return next;
+  }
+  return await visit(document) as unknown[];
+}

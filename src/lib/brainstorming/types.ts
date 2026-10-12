@@ -29,4 +29,4 @@ export function plainText(value: unknown): string {
   return '';
 }
 export function draftKey(user: string,note: string){return `momentum-brainstorm-draft:${user}:${note}`;}
-export function clearDrafts(){for(const key of Object.keys(localStorage)) if(key.startsWith('momentum-brainstorm-draft:')) localStorage.removeItem(key);}
+export function clearDrafts(){for(const key of Object.keys(localStorage)) if(key.startsWith('momentum-brainstorm-draft:')) localStorage.removeItem(key);for(const key of Object.keys(sessionStorage))if(key.startsWith('momentum-brainstorm-lock:'))sessionStorage.removeItem(key);}

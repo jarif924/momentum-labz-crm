@@ -8,6 +8,7 @@ import { Member,Note,clearDrafts,statuses,template } from '@/lib/brainstorming/t
 import { NoteSession,SessionHandle } from '@/components/brainstorming/NoteSession';
 import { Lightbulb,Plus,Pin,Lock } from 'lucide-react';
 import './brainstorming.css';
+import { copyNoteImages } from '@/lib/brainstorming/images';
 const LIMIT=25;
 export default function BrainstormingPage(){
  const client=useRef(createClient()).current,toast=useToast();
@@ -27,8 +28,8 @@ export default function BrainstormingPage(){
   }
   void init();const {data:{subscription}}=client.auth.onAuthStateChange(event=>{if(event==='SIGNED_OUT'){clearDrafts();setSelected(null);setNotes([]);setMe(null);}});return()=>subscription.unsubscribe();
  },[client,loadTags]);
- const load=useCallback(async()=>{
-  if(!me)return;const id=++request.current;setLoading(true);let q=client.from('brainstorm_notes').select('*');
+ const load=useCallback(async(showLoading=true)=>{
+  if(!me)return;const id=++request.current;if(showLoading)setLoading(true);let q=client.from('brainstorm_notes').select('*');
   q=filter==='trash'?q.not('deleted_at','is',null):q.is('deleted_at',null);
   if(filter==='active')q=q.neq('status','archived');else if(filter!=='trash')q=q.eq('status',filter);
   if(tag)q=q.contains('tags',[tag]);if(search){const term=JSON.stringify('%'+search.replace(/[\\%_]/g,'\\$&')+'%');q=q.or(`title.ilike.${term},content.ilike.${term}`);}
@@ -36,9 +37,11 @@ export default function BrainstormingPage(){
   if(id!==request.current)return;setLoading(false);if(err){setError(err.message);return;}setNotes((data||[]).slice(0,LIMIT));setMore((data||[]).length>LIMIT);
  },[client,filter,me,page,search,sort,tag]);
  useEffect(()=>{void load();},[load]);
- const saved=useCallback((n:Note)=>setNotes(prev=>prev.map(x=>x.id===n.id?n:x)),[]);
+ const saved=useCallback((n:Note)=>{setNotes(prev=>prev.map(x=>x.id===n.id?n:x));void load(false);},[load]);
  async function choose(n:Note|null){if(switching.current)return;switching.current=true;try{if(session.current&&!await session.current.flush())return;setSelected(n);session.current=null;const url=new URL(location.href);if(n)url.searchParams.set('note',n.id);else url.searchParams.delete('note');url.searchParams.delete('comment');history.replaceState(null,'',url);}finally{switching.current=false;}}
- async function create(name='Blank',copy?:Note){if(creating)return;if(session.current&&!await session.current.flush())return;setCreating(true);const {data,error:err}=await client.rpc('bn_create',{p_title:copy?copy.title+' (copy)':name==='Blank'?'Untitled Note':name,p_document:copy?.document||template(name),p_visibility:copy?.visibility||'team'});setCreating(false);if(err){toast.error(err.message);return;}setFilter('active');setSearch('');setQuery('');setPage(0);await load();await choose(data);}
+ async function create(name='Blank',copy?:Note){if(creating)return;if(session.current&&!await session.current.flush())return;setCreating(true);const {data,error:err}=copy?await client.rpc('bn_duplicate',{p_note:copy.id}):await client.rpc('bn_create',{p_title:name==='Blank'?'Untitled Note':name,p_document:template(name),p_visibility:'team'});if(err){setCreating(false);toast.error(err.message);return;}
+  if(copy){const token=crypto.randomUUID();try{const lock=await client.rpc('bn_lock',{p_note:data.id,p_token:token});if(lock.error)throw lock.error;const document=await copyNoteImages(data.id,data.document);const result=await client.rpc('bn_save',{p_note:data.id,p_token:token,p_version:data.version,p_patch:{document}});if(result.error)throw result.error;Object.assign(data,result.data);}catch(e:any){await client.rpc('bn_manage',{p_note:data.id,p_action:'trash',p_version:data.version});setCreating(false);toast.error('Could not finish copying the note. The incomplete copy is in Trash. '+e.message);return;}finally{await client.rpc('bn_lock',{p_note:data.id,p_token:token,p_release:true});}}
+  setCreating(false);setFilter('active');setSearch('');setQuery('');setPage(0);await load();await choose(data);}
  return <section className="brainstorming flex h-[calc(100dvh-96px)] min-h-[480px] -m-4 md:-m-6 overflow-hidden bg-neutral-0" aria-label="Brainstorming workspace">
   <aside className={`${selected?'hidden lg:flex':'flex'} w-full lg:w-72 shrink-0 flex-col border-r border-neutral-100 bg-neutral-50 min-h-0`}>
    <div className="p-4 space-y-3 border-b border-neutral-100">
@@ -54,7 +57,7 @@ export default function BrainstormingPage(){
     {!loading&&!notes.length&&<div className="p-4 text-center"><p className="text-h3 mb-2">{search||tag?'No matching notes':'No notes here yet'}</p><p className="text-small text-neutral-500 mb-4">{search||tag?'Try another search or capture a new idea.':'Keep an idea, meeting note, or project discussion here.'}</p>{me&&me.role!=='viewer'&&<Button onClick={()=>void create()}>New Note</Button>}</div>}
     {notes.map(n=><button key={n.id} onClick={()=>void choose(n)} className={`w-full text-left p-3 rounded-md mb-1 border ${selected?.id===n.id?'bg-neutral-0 border-neutral-200':'border-transparent hover:bg-neutral-100'}`}>
      <span className="flex items-center gap-1 text-body-medium text-neutral-900"><span className="truncate flex-1">{n.title||'Untitled Note'}</span>{n.pinned&&<Pin size={14} aria-label="Pinned"/>}{n.visibility==='private'&&<Lock size={14} aria-label="Private"/>}</span>
-     <span className="block truncate text-small text-neutral-500 mt-1">{n.content||'Start writing…'}</span><span className="block text-micro text-neutral-500 mt-2">{statuses[n.status]} · {members.find(m=>m.id===n.updated_by)?.full_name||'Unknown'}</span><span className="block text-micro text-neutral-500">{new Date(n.updated_at).toLocaleDateString()}</span>
+     <span className="block truncate text-small text-neutral-500 mt-1">{n.content||'Start writing…'}</span><span className="block text-micro text-neutral-500 mt-2">{statuses[n.status]} · Edited by {members.find(m=>m.id===n.updated_by)?.full_name||'Unknown'}</span><span className="block text-micro text-neutral-500">{new Date(n.updated_at).toLocaleString()}</span><span className="block text-micro text-neutral-500">Created by {members.find(m=>m.id===n.created_by)?.full_name||'Unknown'}</span>
     </button>)}
    </div>
    <div className="p-2 border-t border-neutral-100 flex justify-between items-center"><Button variant="ghost" size="compact" disabled={!page} onClick={()=>setPage(page-1)}>Previous</Button><span className="text-small">Page {page+1}</span><Button variant="ghost" size="compact" disabled={!more} onClick={()=>setPage(page+1)}>Next</Button></div>

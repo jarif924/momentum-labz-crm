@@ -74,6 +74,7 @@ export function Topbar() {
   const unreadCount = notifications.filter(n => !n.is_read).length
 
   async function handleSignOut() {
+    if(Object.keys(localStorage).some(key=>key.startsWith('momentum-brainstorm-draft:'))&&!window.confirm('You have unsaved note changes. Sign out and discard the browser drafts?'))return
     clearDrafts()
     await supabase.auth.signOut()
     router.push('/login')
@@ -109,7 +110,7 @@ export function Topbar() {
         {/* Notifications */}
         <div className="relative">
           <button
-            onClick={() => setNotifOpen(!notifOpen)}
+            aria-label="Notifications" title="Notifications" onClick={() => setNotifOpen(!notifOpen)}
             className="relative h-10 w-10 flex items-center justify-center rounded-md text-neutral-400 hover:text-neutral-900 hover:bg-neutral-50 transition-colors"
           >
             <Bell size={20} strokeWidth={1.75} />

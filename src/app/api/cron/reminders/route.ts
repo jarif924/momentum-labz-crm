@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { maintainBrainstorming } from '@/lib/brainstorming/maintenance'
 
 export const dynamic = 'force-dynamic'
 
@@ -28,6 +29,7 @@ export async function GET(request: Request) {
   const supabase = createAdminClient()
 
   try {
+    await maintainBrainstorming()
     const today = new Date().toISOString().split('T')[0]
     let created = 0
 

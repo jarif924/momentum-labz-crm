@@ -10,5 +10,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Ping Reminders API
+        env:
+          CRM_CRON_SECRET: ${{ secrets.CRON_SECRET }}
         run: |
-          curl -s -o /dev/null -w "%{http_code}" -X GET "https://momentum-labz-crm.pages.dev/api/cron/reminders?secret=${{ secrets.CRON_SECRET }}"
+          curl --fail --silent --show-error -H "Authorization: Bearer $CRM_CRON_SECRET" "https://crm.momentumlabzz.com/api/cron/reminders"

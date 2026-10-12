@@ -42,6 +42,7 @@ next-env.d.ts
 /test-results/
 /.brainstorm-local/
 /.next-brainstorm/
+/.next-brainstorm-preview/
 
 # Local tooling / one-off scripts
 .wrangler/
