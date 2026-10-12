@@ -38,6 +38,7 @@ next-env.d.ts
 
 # Local backups and browser test sessions
 /backups/
+/docs/backups/
 /playwright-report/
 /test-results/
 /.brainstorm-local/
