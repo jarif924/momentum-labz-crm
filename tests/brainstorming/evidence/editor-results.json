@@ -1,0 +1,36 @@
+{
+  "id": "79717696-7870-4a75-9fdd-dfad69f00054",
+  "checks": [
+    "English and Bengali paragraphs, line breaks",
+    "Add Heading 1",
+    "Add Heading 2",
+    "Add Heading 3",
+    "Add Bullet",
+    "Add Numbered",
+    "Add Checklist",
+    "Add Quote",
+    "Add Callout",
+    "Add Toggle",
+    "Add Divider",
+    "Add Table",
+    "Undo and redo",
+    "Duplicate and delete block actions",
+    "Keyboard bold italic underline",
+    "Paste HTML heading list link strips styling",
+    "Invalid image rejects file"
+  ],
+  "failures": [
+    {
+      "name": "Slash menu",
+      "error": "locator.click: Timeout 20000ms exceeded.\nCall log:\n\u001b[2m  - waiting for getByRole('option').filter({ hasText: 'Heading 2' }).first()\u001b[22m\n\u001b[2m    - locator resolved to <option value=\"heading:2\">Heading 2</option>\u001b[22m\n\u001b[2m  - attempting click action\u001b[22m\n\u001b[2m    2 × waiting for element to be visible, enabled and stable\u001b[22m\n\u001b[2m      - element is not visible\u001b[22m\n\u001b[2m    - retrying click action\u001b[22m\n\u001b[2m    - waiting 20ms\u001b[22m\n\u001b[2m    2 × waiting for element to be visible, enabled and stable\u001b[22m\n\u001b[2m      - element is not visible\u001b[22m\n\u001b[2m    - retrying click action\u001b[22m\n\u001b[2m      - waiting 100ms\u001b[22m\n\u001b[2m    38 × waiting for element to be visible, enabled and stable\u001b[22m\n\u001b[2m       - element is not visible\u001b[22m\n\u001b[2m     - retrying click action\u001b[22m\n\u001b[2m       - waiting 500ms\u001b[22m\n"
+    },
+    {
+      "name": "Image upload and durable private persistence",
+      "error": "The expression evaluated to a falsy value:\n\n  assert.ok(await page.locator('.bn-editor img').last().evaluate(i=>i.complete&&i.naturalWidth>0))\n"
+    },
+    {
+      "name": "Mobile block controls and no overflow",
+      "error": "locator.click: Timeout 20000ms exceeded.\nCall log:\n\u001b[2m  - waiting for getByRole('button', { name: 'Block actions', exact: true })\u001b[22m\n"
+    }
+  ]
+}

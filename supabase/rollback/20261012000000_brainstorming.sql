@@ -1,6 +1,10 @@
 -- Run only after backing up; keeps a private full-fidelity rollback archive.
 -- Does not run automatically and is never applied to production by this task.
 begin;
+-- Keep every earlier rollback archive rather than overwriting it.
+do $$ begin if exists(select 1 from pg_namespace where nspname='brainstorming_rollback') then execute format('alter schema brainstorming_rollback rename to %I','brainstorming_rollback_'||to_char(clock_timestamp(),'YYYYMMDDHH24MISS')||'_'||substr(gen_random_uuid()::text,1,8)); end if; end $$;
+drop index if exists public.bn_notes_author;
+drop table if exists public.brainstorm_image_cleanup;
 create schema if not exists brainstorming_rollback;
 revoke all on schema brainstorming_rollback from public,anon,authenticated;
 create table brainstorming_rollback.notes as table public.brainstorm_notes;
