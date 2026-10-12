@@ -2,6 +2,8 @@
 
 Internal CRM for Momentum Labz — built with Next.js 14 (App Router), TypeScript, Tailwind CSS, and Supabase.
 
+For the complete feature, architecture, database, security, setup, testing, and development-history reference, see [OVERVIEW.md](./OVERVIEW.md).
+
 ---
 
 ## Quick Start
