@@ -20,9 +20,9 @@ export function LeadFormModal({ isOpen, onClose, lead, onSave }: { isOpen: boole
 
   const [formData, setFormData] = useState<any>({
     contact_id: '',
-    new_contact_name: '',
     company_id: '',
-    new_company_name: '',
+    company_name: '',
+    company_url: '',
     services: [],
     region: 'international',
     preferred_channel: 'email',
@@ -35,8 +35,6 @@ export function LeadFormModal({ isOpen, onClose, lead, onSave }: { isOpen: boole
     running_meta_ads: false
   });
 
-  const [contacts, setContacts] = useState<any[]>([]);
-  const [companies, setCompanies] = useState<any[]>([]);
   const [stages, setStages] = useState<any[]>([]);
   const [availableServices, setAvailableServices] = useState<string[]>([]);
   const [customFieldsSchema, setCustomFieldsSchema] = useState<any[]>([]);
@@ -53,9 +51,9 @@ export function LeadFormModal({ isOpen, onClose, lead, onSave }: { isOpen: boole
       if (lead) {
         setFormData({
           contact_id: lead.contact_id || '',
-          new_contact_name: '',
           company_id: lead.company_id || '',
-          new_company_name: '',
+          company_name: lead.companies?.name || lead.contacts?.full_name || '',
+          company_url: lead.companies?.website || '',
           services: lead.services || [],
           region: lead.region || 'international',
           preferred_channel: lead.preferred_channel || 'email',
@@ -74,9 +72,9 @@ export function LeadFormModal({ isOpen, onClose, lead, onSave }: { isOpen: boole
       } else {
         setFormData({
           contact_id: '',
-          new_contact_name: '',
           company_id: '',
-          new_company_name: '',
+          company_name: '',
+          company_url: '',
           services: [],
           region: 'international',
           preferred_channel: 'email',
@@ -97,18 +95,14 @@ export function LeadFormModal({ isOpen, onClose, lead, onSave }: { isOpen: boole
 
   async function fetchData() {
     const results = await Promise.all([
-      supabase.from('contacts').select('*').order('full_name'),
-      supabase.from('companies').select('*').order('name'),
       supabase.from('pipeline_stages').select('*').order('sort_order'),
       supabase.from('system_settings').select('services, lead_custom_fields, lead_sources, currency_mapping').eq('id', 1).single(),
       supabase.from('tags').select('*').order('name')
     ]) as any;
-    const [{ data: cData }, { data: compData }, { data: stData }, { data: setData }, { data: tagsData }] = results;
+    const [{ data: stData }, { data: setData }, { data: tagsData }] = results;
     const loadError = results.find((r: any) => r.error)?.error;
     if (loadError) toast.error(`Couldn't load form options: ${friendlyError(loadError)}`);
 
-    if (cData) setContacts(cData);
-    if (compData) setCompanies(compData);
     if (stData) setStages(stData);
     if (tagsData) setAvailableTags(tagsData);
     if (setData) {
@@ -123,26 +117,38 @@ export function LeadFormModal({ isOpen, onClose, lead, onSave }: { isOpen: boole
   }
 
   async function handleSubmit() {
-    if (!formData.contact_id) { toast.error('Choose a contact or create a new one.'); return; }
-    if (formData.contact_id === 'NEW' && !formData.new_contact_name?.trim()) { toast.error('Enter the new contact’s name.'); return; }
-    if (formData.company_id === 'NEW' && !formData.new_company_name?.trim()) { toast.error('Enter the new company’s name.'); return; }
+    if (!formData.company_name?.trim()) { toast.error('Enter the company name.'); return; }
     const fieldError = validateCustomFields(customFieldsSchema, formData.custom_fields || {});
     if (fieldError) { toast.error(fieldError); return; }
     if (loading) return;
     setLoading(true);
     try {
-      let finalContactId = formData.contact_id;
-      if (formData.contact_id === 'NEW') {
-        const { data: c, error } = await (supabase.from('contacts') as any).insert({ full_name: formData.new_contact_name.trim() }).select().single();
-        if (error || !c) throw error;
-        finalContactId = c.id;
+      const companyDetails = {
+        name: formData.company_name.trim(),
+        website: formData.company_url.trim() || null,
+      };
+      let finalCompanyId = formData.company_id || null;
+      if (finalCompanyId) {
+        const { error } = await (supabase.from('companies') as any).update(companyDetails).eq('id', finalCompanyId);
+        if (error) throw error;
+      } else {
+        const { data: company, error } = await (supabase.from('companies') as any).insert(companyDetails).select().single();
+        if (error || !company) throw error || new Error('Company could not be saved.');
+        finalCompanyId = company.id;
+        setFormData((f: any) => ({ ...f, company_id: company.id }));
       }
 
-      let finalCompanyId = formData.company_id || null;
-      if (formData.company_id === 'NEW') {
-        const { data: comp, error } = await (supabase.from('companies') as any).insert({ name: formData.new_company_name.trim() }).select().single();
-        if (error || !comp) throw error;
-        finalCompanyId = comp.id;
+      // The current lead schema requires a contact. Create it automatically
+      // using the business name so prospect entry needs only company details.
+      let finalContactId = formData.contact_id || null;
+      if (!finalContactId) {
+        const { data: contact, error } = await (supabase.from('contacts') as any).insert({
+          full_name: companyDetails.name,
+          company_id: finalCompanyId,
+        }).select().single();
+        if (error || !contact) throw error || new Error('Lead details could not be saved.');
+        finalContactId = contact.id;
+        setFormData((f: any) => ({ ...f, contact_id: contact.id }));
       }
 
       const payload = {
@@ -192,29 +198,21 @@ export function LeadFormModal({ isOpen, onClose, lead, onSave }: { isOpen: boole
     <Modal isOpen={isOpen} onClose={onClose} title={lead ? 'Edit Lead' : 'Add Lead'}>
       <div className="flex flex-col gap-4 max-h-[70vh] overflow-y-auto p-1">
         
-        {/* Contact Selection */}
-        <div className="flex flex-col gap-2">
-          <Select label="Contact *" value={formData.contact_id} onChange={e => setFormData({...formData, contact_id: e.target.value})}>
-            <option value="">Select a contact...</option>
-            <option value="NEW">+ Create New Contact</option>
-            {contacts.map(c => <option key={c.id} value={c.id}>{c.full_name}</option>)}
-          </Select>
-          {formData.contact_id === 'NEW' && (
-            <Input placeholder="New Contact Name" value={formData.new_contact_name} onChange={e => setFormData({...formData, new_contact_name: e.target.value})} />
-          )}
-        </div>
-
-        {/* Company Selection */}
-        <div className="flex flex-col gap-2">
-          <Select label="Company" value={formData.company_id} onChange={e => setFormData({...formData, company_id: e.target.value})}>
-            <option value="">None</option>
-            <option value="NEW">+ Create New Company</option>
-            {companies.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-          </Select>
-          {formData.company_id === 'NEW' && (
-            <Input placeholder="New Company Name" value={formData.new_company_name} onChange={e => setFormData({...formData, new_company_name: e.target.value})} />
-          )}
-        </div>
+        <Input
+          label="Company Name *"
+          aria-label="Company Name"
+          placeholder="Enter the company name"
+          value={formData.company_name}
+          onChange={e => setFormData({ ...formData, company_name: e.target.value })}
+        />
+        <Input
+          label="Company URL"
+          aria-label="Company URL"
+          type="text"
+          placeholder="Website or Facebook page URL"
+          value={formData.company_url}
+          onChange={e => setFormData({ ...formData, company_url: e.target.value })}
+        />
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <Select label="Service Line" value={formData.service_line} onChange={e => setFormData({...formData, service_line: e.target.value})}>
@@ -359,7 +357,7 @@ export function LeadFormModal({ isOpen, onClose, lead, onSave }: { isOpen: boole
 
         <div className="flex justify-end gap-3 mt-4 pt-4 border-t border-neutral-100">
           <Button variant="secondary" onClick={onClose} disabled={loading}>Cancel</Button>
-          <Button onClick={handleSubmit} disabled={loading || (formData.contact_id === 'NEW' && !formData.new_contact_name) || !formData.contact_id}>
+          <Button onClick={handleSubmit} disabled={loading || !formData.company_name?.trim()}>
             {loading ? 'Saving...' : 'Save Lead'}
           </Button>
         </div>

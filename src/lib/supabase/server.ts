@@ -5,9 +5,12 @@ import type { Database } from '@/types/supabase'
 export async function createClient() {
   const cookieStore = await cookies()
 
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://loivivphqzedhutgxzcl.supabase.co'
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'sb_publishable_HM3t_f-GG4h9_CjPSWxsUw_7Lq04gic'
+
   return createServerClient<Database>(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    supabaseUrl,
+    supabaseAnonKey,
     {
       cookies: {
         getAll() {

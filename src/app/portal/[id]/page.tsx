@@ -1,5 +1,4 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import Image from 'next/image'
 import { notFound } from 'next/navigation'
 import { CheckCircle2, Clock, ExternalLink, Calendar, Video, CreditCard, TrendingUp, Users, DollarSign } from 'lucide-react'
 import { PortalTaskApproveButton } from '@/components/portal/PortalTaskApproveButton'
@@ -31,11 +30,12 @@ export default async function ClientPortalPage({ params }: { params: { id: strin
       return notFound();
     }
 
+    const portalData = proj as any
     project = {
       ...proj,
-      company_name: Array.isArray(proj.company) ? proj.company[0]?.name : proj.company?.name,
-      client_name: Array.isArray(proj.lead?.contact) ? proj.lead?.contact[0]?.full_name : proj.lead?.contact?.full_name,
-      lead_currency: proj.lead?.currency,
+      company_name: Array.isArray(portalData.company) ? portalData.company[0]?.name : portalData.company?.name,
+      client_name: Array.isArray(portalData.lead?.contact) ? portalData.lead?.contact[0]?.full_name : portalData.lead?.contact?.full_name,
+      lead_currency: portalData.lead?.currency,
       est_roi_value: (proj.leads_generated || 0) * 1500
     };
 

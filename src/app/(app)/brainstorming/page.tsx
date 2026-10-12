@@ -1,213 +1,64 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 'use client';
-
-import { useState, useEffect } from 'react';
-import { createBrowserClient } from '@supabase/ssr';
-import { Database } from '@/types/supabase';
-import { Button } from '@/components/ui/Forms';
-import { Plus, Trash2, Save, FileText, CheckCircle, Lightbulb } from 'lucide-react';
+import { useCallback,useEffect,useRef,useState } from 'react';
+import { createClient } from '@/lib/supabase/client';
+import { Button,Input } from '@/components/ui/Forms';
 import { useToast } from '@/components/ui/Toast';
-import { friendlyError } from '@/lib/errors';
-
-export default function BrainstormingPage() {
-  const supabase = createBrowserClient<Database>(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  );
-
-  const [notes, setNotes] = useState<any[]>([]);
-  const [activeNote, setActiveNote] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [creating, setCreating] = useState(false);
-  const toast = useToast();
-
-  useEffect(() => {
-    fetchNotes();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  async function fetchNotes() {
-    setLoading(true);
-    const { data, error } = await supabase
-      .from('brainstorm_notes')
-      .select('*')
-      .order('updated_at', { ascending: false });
-
-    if (error) toast.error(`Couldn't load ideas: ${friendlyError(error)}`);
-    if (data) {
-      setNotes(data);
-      if (data.length > 0 && !activeNote) {
-        setActiveNote(data[0]);
-      }
-    }
-    setLoading(false);
+import { Member,Note,clearDrafts,statuses,template } from '@/lib/brainstorming/types';
+import { NoteSession,SessionHandle } from '@/components/brainstorming/NoteSession';
+import { Lightbulb,Plus,Pin,Lock } from 'lucide-react';
+import './brainstorming.css';
+const LIMIT=25;
+export default function BrainstormingPage(){
+ const client=useRef(createClient()).current,toast=useToast();
+ const [me,setMe]=useState<Member|null>(null),[members,setMembers]=useState<Member[]>([]),[notes,setNotes]=useState<Note[]>([]),[selected,setSelected]=useState<Note|null>(null),[tags,setTags]=useState<string[]>([]),[links,setLinks]=useState<any[]>([]),[query,setQuery]=useState(''),[search,setSearch]=useState(''),[filter,setFilter]=useState('active'),[tag,setTag]=useState(''),[sort,setSort]=useState('updated_at'),[page,setPage]=useState(0),[more,setMore]=useState(false),[loading,setLoading]=useState(true),[creating,setCreating]=useState(false),[error,setError]=useState('');
+ const session=useRef<SessionHandle|null>(null),switching=useRef(false),request=useRef(0);
+ useEffect(()=>{const t=setTimeout(()=>{setSearch(query);setPage(0);},300);return()=>clearTimeout(t);},[query]);
+ const loadTags=useCallback(async()=>{const {data}=await client.from('brainstorm_tags').select('name').order('name');setTags((data||[]).map((t:any)=>t.name));},[client]);
+ useEffect(()=>{
+  async function init(){
+   const {data:{user}}=await client.auth.getUser();if(!user){setError('Please sign in to use Brainstorming.');setLoading(false);return;}
+   const directory=await client.from('users').select('id,full_name,role');if(directory.error){setError(directory.error.message);return;}
+   setMembers(directory.data||[]);const member=directory.data?.find((m:any)=>m.id===user.id);if(!member){setError('Your account is not a CRM team member.');setLoading(false);return;}setMe(member);
+   await loadTags();
+   const results=await Promise.all([client.from('projects').select('id,name'),client.from('leads').select('id,companies(name),contacts(full_name)'),client.from('contacts').select('id,full_name').eq('is_client',true)]);
+   setLinks([...(results[0].data||[]).map((r:any)=>({id:r.id,name:r.name,kind:'project',href:'/projects/'+r.id})),...(results[1].data||[]).map((r:any)=>({id:r.id,name:r.companies?.name||r.contacts?.full_name||'Lead',kind:'lead',href:'/leads?lead='+r.id})),...(results[2].data||[]).map((r:any)=>({id:r.id,name:r.full_name,kind:'client',href:'/clients#client-'+r.id}))]);
+   const id=new URLSearchParams(location.search).get('note');if(id){const {data,error:err}=await client.from('brainstorm_notes').select('*').eq('id',id).maybeSingle();if(data)setSelected(data);else if(err)setError(err.message);else setError('This note is not available to your account.');}
   }
-
-  async function createNewNote() {
-    if (creating) return;
-    setCreating(true);
-    const { data, error } = await supabase
-      .from('brainstorm_notes')
-      .insert({
-        title: 'Untitled Idea',
-        content: '',
-        status: 'idea'
-      })
-      .select()
-      .single();
-    setCreating(false);
-
-    if (error || !data) {
-      toast.error(`Couldn't create idea: ${friendlyError(error)}`);
-      return;
-    }
-    setNotes([data, ...notes]);
-    setActiveNote(data);
-  }
-
-  async function saveActiveNote() {
-    if (!activeNote) return;
-    setSaving(true);
-    const { error } = await supabase
-      .from('brainstorm_notes')
-      .update({
-        title: activeNote.title,
-        content: activeNote.content,
-        status: activeNote.status
-      })
-      .eq('id', activeNote.id);
-
-    if (error) {
-      setSaving(false);
-      toast.error(`Couldn't save idea: ${friendlyError(error)}`);
-      return;
-    }
-    // Update local state without full refetch to avoid losing focus
-    setNotes(notes.map(n => n.id === activeNote.id ? activeNote : n));
-    setSaving(false);
-  }
-
-  async function deleteNote(id: string) {
-    if (!confirm('Are you sure you want to delete this idea?')) return;
-    const { error } = await supabase.from('brainstorm_notes').delete().eq('id', id);
-    if (error) {
-      toast.error(`Couldn't delete idea: ${friendlyError(error)}`);
-      return;
-    }
-    if (activeNote?.id === id) {
-      setActiveNote(null);
-    }
-    fetchNotes();
-  }
-
-  return (
-    <div className="flex h-full -m-4 md:-m-6 bg-white overflow-hidden">
-      {/* Sidebar List */}
-      <div className="w-64 lg:w-80 border-r border-neutral-100 flex flex-col bg-neutral-50 shrink-0">
-        <div className="p-4 border-b border-neutral-100 flex items-center justify-between">
-          <h2 className="font-semibold text-neutral-900 flex items-center gap-2">
-            <Lightbulb size={16} className="text-accent-600" />
-            Brainstorming
-          </h2>
-          <button 
-            onClick={createNewNote}
-            disabled={creating}
-            aria-label="New idea"
-            className="p-1.5 bg-neutral-200/50 hover:bg-neutral-200 text-neutral-600 rounded-md transition-colors"
-          >
-            <Plus size={16} />
-          </button>
-        </div>
-        
-        <div className="flex-1 overflow-y-auto p-2">
-          {loading ? (
-            <div className="text-center p-4 text-xs text-neutral-400">Loading ideas...</div>
-          ) : notes.length === 0 ? (
-            <div className="text-center p-6 text-xs text-neutral-400">No ideas yet. Create one!</div>
-          ) : (
-            notes.map(note => (
-              <button
-                key={note.id}
-                onClick={() => setActiveNote(note)}
-                className={`w-full text-left p-3 rounded-lg mb-1 transition-colors group ${activeNote?.id === note.id ? 'bg-white shadow-sm border border-neutral-200' : 'hover:bg-neutral-200/50 border border-transparent'}`}
-              >
-                <div className="font-medium text-sm text-neutral-900 truncate">
-                  {note.title || 'Untitled Idea'}
-                </div>
-                <div className="flex items-center justify-between mt-2">
-                  <span className={`text-[10px] px-1.5 py-0.5 rounded uppercase font-semibold ${
-                    note.status === 'done' ? 'bg-green-100 text-green-700' :
-                    note.status === 'in_progress' ? 'bg-blue-100 text-blue-700' :
-                    'bg-neutral-200 text-neutral-600'
-                  }`}>
-                    {note.status.replace('_', ' ')}
-                  </span>
-                  <span className="text-[10px] text-neutral-400">
-                    {new Date(note.updated_at).toLocaleDateString()}
-                  </span>
-                </div>
-              </button>
-            ))
-          )}
-        </div>
-      </div>
-
-      {/* Editor Area */}
-      <div className="flex-1 flex flex-col min-w-0 bg-white relative">
-        {activeNote ? (
-          <>
-            <div className="h-14 border-b border-neutral-100 flex items-center justify-between px-6 shrink-0">
-              <div className="flex items-center gap-3">
-                <select 
-                  className="text-xs font-semibold uppercase bg-neutral-100 text-neutral-700 rounded-md px-2 py-1 border-none outline-none focus:ring-2 focus:ring-accent-500"
-                  value={activeNote.status}
-                  onChange={(e) => setActiveNote({...activeNote, status: e.target.value})}
-                >
-                  <option value="idea">Idea</option>
-                  <option value="in_progress">In Progress</option>
-                  <option value="done">Done</option>
-                  <option value="archived">Archived</option>
-                </select>
-                {saving && <span className="text-xs text-neutral-400 flex items-center gap-1"><Save size={12}/> Saving...</span>}
-              </div>
-              <div className="flex items-center gap-2">
-                <Button variant="ghost" size="compact" onClick={saveActiveNote}>
-                  <CheckCircle size={14} className="mr-1.5" /> Save
-                </Button>
-                <Button variant="ghost" size="compact" className="text-red-500 hover:text-red-600 hover:bg-red-50" onClick={() => deleteNote(activeNote.id)}>
-                  <Trash2 size={14} />
-                </Button>
-              </div>
-            </div>
-
-            <div className="flex-1 overflow-y-auto">
-              <div className="max-w-3xl mx-auto py-12 px-8">
-                <input
-                  type="text"
-                  value={activeNote.title}
-                  onChange={(e) => setActiveNote({...activeNote, title: e.target.value})}
-                  onBlur={saveActiveNote}
-                  placeholder="Untitled Idea"
-                  className="w-full text-4xl font-bold text-neutral-900 placeholder:text-neutral-300 border-none outline-none bg-transparent mb-8"
-                />
-                <textarea
-                  value={activeNote.content || ''}
-                  onChange={(e) => setActiveNote({...activeNote, content: e.target.value})}
-                  onBlur={saveActiveNote}
-                  placeholder="Start brainstorming, typing out concepts, or pasting links..."
-                  className="w-full h-[500px] text-base text-neutral-700 leading-relaxed placeholder:text-neutral-300 border-none outline-none bg-transparent resize-none"
-                />
-              </div>
-            </div>
-          </>
-        ) : (
-          <div className="flex-1 flex flex-col items-center justify-center text-neutral-400">
-            <FileText size={48} className="mb-4 text-neutral-200" />
-            <p>Select a note or create a new one to start brainstorming.</p>
-          </div>
-        )}
-      </div>
-    </div>
-  );
+  void init();const {data:{subscription}}=client.auth.onAuthStateChange(event=>{if(event==='SIGNED_OUT'){clearDrafts();setSelected(null);setNotes([]);setMe(null);}});return()=>subscription.unsubscribe();
+ },[client,loadTags]);
+ const load=useCallback(async()=>{
+  if(!me)return;const id=++request.current;setLoading(true);let q=client.from('brainstorm_notes').select('*');
+  q=filter==='trash'?q.not('deleted_at','is',null):q.is('deleted_at',null);
+  if(filter==='active')q=q.neq('status','archived');else if(filter!=='trash')q=q.eq('status',filter);
+  if(tag)q=q.contains('tags',[tag]);if(search){const term=JSON.stringify('%'+search.replace(/[\\%_]/g,'\\$&')+'%');q=q.or(`title.ilike.${term},content.ilike.${term}`);}
+  const {data,error:err}=await q.order('pinned',{ascending:false}).order(sort,{ascending:sort==='title'}).order('id').range(page*LIMIT,page*LIMIT+LIMIT);
+  if(id!==request.current)return;setLoading(false);if(err){setError(err.message);return;}setNotes((data||[]).slice(0,LIMIT));setMore((data||[]).length>LIMIT);
+ },[client,filter,me,page,search,sort,tag]);
+ useEffect(()=>{void load();},[load]);
+ const saved=useCallback((n:Note)=>setNotes(prev=>prev.map(x=>x.id===n.id?n:x)),[]);
+ async function choose(n:Note|null){if(switching.current)return;switching.current=true;try{if(session.current&&!await session.current.flush())return;setSelected(n);session.current=null;const url=new URL(location.href);if(n)url.searchParams.set('note',n.id);else url.searchParams.delete('note');url.searchParams.delete('comment');history.replaceState(null,'',url);}finally{switching.current=false;}}
+ async function create(name='Blank',copy?:Note){if(creating)return;if(session.current&&!await session.current.flush())return;setCreating(true);const {data,error:err}=await client.rpc('bn_create',{p_title:copy?copy.title+' (copy)':name==='Blank'?'Untitled Note':name,p_document:copy?.document||template(name),p_visibility:copy?.visibility||'team'});setCreating(false);if(err){toast.error(err.message);return;}setFilter('active');setSearch('');setQuery('');setPage(0);await load();await choose(data);}
+ return <section className="brainstorming flex h-[calc(100dvh-96px)] min-h-[480px] -m-4 md:-m-6 overflow-hidden bg-neutral-0" aria-label="Brainstorming workspace">
+  <aside className={`${selected?'hidden lg:flex':'flex'} w-full lg:w-72 shrink-0 flex-col border-r border-neutral-100 bg-neutral-50 min-h-0`}>
+   <div className="p-4 space-y-3 border-b border-neutral-100">
+    <h1 className="text-h2 flex gap-2 items-center"><Lightbulb size={20}/>Brainstorming</h1>
+    {me?.role!=='viewer'&&me&&<div className="flex gap-2"><Button className="flex-1" disabled={creating} onClick={()=>void create()}><Plus size={16} className="mr-1"/>{creating?'Creating…':'New Note'}</Button><select aria-label="Create from template" value="" className="min-w-0 max-w-24 text-small rounded-md border border-neutral-200 bg-neutral-0" disabled={creating} onChange={e=>void create(e.target.value)}><option value="">Template</option>{['Quick Idea','Project Brainstorm','Meeting Notes'].map(t=><option key={t}>{t}</option>)}</select></div>}
+    <Input aria-label="Search notes" placeholder="Search notes…" value={query} onChange={e=>setQuery(e.target.value)}/>
+    <div className="grid grid-cols-2 gap-2"><select aria-label="Filter status" value={filter} onChange={e=>{setFilter(e.target.value);setPage(0);}} className="h-10 rounded-md border border-neutral-200 bg-neutral-0 px-2 text-small"><option value="active">Active notes</option>{Object.entries(statuses).map(([v,l])=><option key={v} value={v}>{l}</option>)}<option value="trash">Trash</option></select><select aria-label="Filter tag" value={tag} onChange={e=>{setTag(e.target.value);setPage(0);}} className="h-10 rounded-md border border-neutral-200 bg-neutral-0 px-2 text-small"><option value="">All tags</option>{tags.map(t=><option key={t}>{t}</option>)}</select></div>
+    <select aria-label="Sort notes" value={sort} onChange={e=>{setSort(e.target.value);setPage(0);}} className="w-full h-10 rounded-md border border-neutral-200 bg-neutral-0 px-2 text-small"><option value="updated_at">Last edited</option><option value="created_at">Created date</option><option value="title">Title</option></select>
+   </div>
+   {error&&<div role="alert" className="p-3 text-small text-danger-text">{error}<Button variant="ghost" onClick={()=>{setError('');void load();}}>Retry</Button></div>}
+   <div className="flex-1 overflow-y-auto p-2">
+    {loading&&<p className="p-4 text-small text-neutral-500">Loading notes…</p>}
+    {!loading&&!notes.length&&<div className="p-4 text-center"><p className="text-h3 mb-2">{search||tag?'No matching notes':'No notes here yet'}</p><p className="text-small text-neutral-500 mb-4">{search||tag?'Try another search or capture a new idea.':'Keep an idea, meeting note, or project discussion here.'}</p>{me&&me.role!=='viewer'&&<Button onClick={()=>void create()}>New Note</Button>}</div>}
+    {notes.map(n=><button key={n.id} onClick={()=>void choose(n)} className={`w-full text-left p-3 rounded-md mb-1 border ${selected?.id===n.id?'bg-neutral-0 border-neutral-200':'border-transparent hover:bg-neutral-100'}`}>
+     <span className="flex items-center gap-1 text-body-medium text-neutral-900"><span className="truncate flex-1">{n.title||'Untitled Note'}</span>{n.pinned&&<Pin size={14} aria-label="Pinned"/>}{n.visibility==='private'&&<Lock size={14} aria-label="Private"/>}</span>
+     <span className="block truncate text-small text-neutral-500 mt-1">{n.content||'Start writing…'}</span><span className="block text-micro text-neutral-500 mt-2">{statuses[n.status]} · {members.find(m=>m.id===n.updated_by)?.full_name||'Unknown'}</span><span className="block text-micro text-neutral-500">{new Date(n.updated_at).toLocaleDateString()}</span>
+    </button>)}
+   </div>
+   <div className="p-2 border-t border-neutral-100 flex justify-between items-center"><Button variant="ghost" size="compact" disabled={!page} onClick={()=>setPage(page-1)}>Previous</Button><span className="text-small">Page {page+1}</span><Button variant="ghost" size="compact" disabled={!more} onClick={()=>setPage(page+1)}>Next</Button></div>
+  </aside>
+  {selected&&me?<NoteSession key={selected.id} initial={selected} me={me} members={members} tags={tags} links={links} onSaved={saved} onBack={()=>void choose(null)} onDuplicate={n=>void create('Blank',n)} onTags={()=>void loadTags()} onRemoved={()=>{setSelected(null);session.current=null;void load();}} handle={session}/>:<div className="hidden lg:flex flex-1 items-center justify-center p-6 text-center"><div><Lightbulb size={48} className="mx-auto text-neutral-200 mb-4"/><h2 className="text-h2 mb-2">Room for your next idea</h2><p className="text-small text-neutral-500">Open a note or choose New Note to start writing.</p></div></div>}
+ </section>;
 }

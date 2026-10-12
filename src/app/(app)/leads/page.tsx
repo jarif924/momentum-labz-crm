@@ -83,7 +83,12 @@ export default function LeadsPage() {
     if (tagsData) setAllTags(tagsData);
 
     if (stagesData) setStages(stagesData);
-    if (leadsData) setLeads(leadsData);
+    if (leadsData) {
+      setLeads(leadsData);
+      const linkedId = new URLSearchParams(window.location.search).get('lead');
+      const linkedLead = linkedId && leadsData.find((item: any) => item.id === linkedId);
+      if (linkedLead) { setSelectedLead(linkedLead); setIsDrawerOpen(true); }
+    }
     setLoading(false);
   }
 

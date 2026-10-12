@@ -1,6 +1,5 @@
-import { Avatar } from "@/components/ui/Avatar";
-
 'use client';
+import { Avatar } from '@/components/ui/Avatar';
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 import { useState, useEffect } from 'react';

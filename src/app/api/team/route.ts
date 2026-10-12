@@ -82,9 +82,11 @@ export async function POST(req: Request) {
       createdLogin = true
     }
 
+
     const { error: rowErr } = existingRow
-      ? await admin.from('users').update({ full_name, role }).eq('id', id)
-      : await admin.from('users').insert({ id, full_name, email, role })
+      ? await admin.from('users').update({ full_name, role, avatar_url: body.avatar_url === undefined ? null : body.avatar_url }).eq('id', id)
+      : await admin.from('users').insert({ id, full_name, email, role, avatar_url: body.avatar_url === undefined ? null : body.avatar_url })
+
     if (rowErr) {
       if (createdLogin) await admin.auth.admin.deleteUser(id!)
       return fail(400, rowErr.code === '23505' ? 'Someone with this email is already on the team.' : rowErr.message)
@@ -109,11 +111,16 @@ export async function PATCH(req: Request) {
     if (!target) return fail(404, 'Team member not found.')
 
     const patch: Partial<Member> = {}
+
     if (body.full_name !== undefined) {
       const n = String(body.full_name).trim()
       if (n.length < 2) return fail(400, 'Enter their full name.')
       patch.full_name = n
     }
+    if (body.avatar_url !== undefined) {
+      patch.avatar_url = body.avatar_url === null ? null : String(body.avatar_url)
+    }
+
     if (body.role !== undefined) {
       const role = String(body.role) as Role
       if (!ROLES.includes(role)) return fail(400, 'Choose a valid role.')
@@ -159,3 +166,4 @@ export async function DELETE(req: Request) {
     return fail(500, errMsg(e))
   }
 }
+export const runtime = 'edge';

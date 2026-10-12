@@ -2,6 +2,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 'use client'
+import { clearDrafts } from '@/lib/brainstorming/types'
 import { Avatar } from "@/components/ui/Avatar"
 
 
@@ -73,6 +74,7 @@ export function Topbar() {
   const unreadCount = notifications.filter(n => !n.is_read).length
 
   async function handleSignOut() {
+    clearDrafts()
     await supabase.auth.signOut()
     router.push('/login')
     router.refresh()

@@ -63,7 +63,7 @@ export default function ClientsPage() {
             const currency = client.leads?.[0]?.currency || 'USD';
 
             return (
-              <div key={client.id} className="bg-neutral-0 border border-neutral-100 rounded-[16px] overflow-hidden hover:shadow-md transition-shadow">
+              <div key={client.id} id={`client-${client.id}`} tabIndex={-1} className="bg-neutral-0 border border-neutral-100 rounded-[16px] overflow-hidden hover:shadow-md transition-shadow">
                 <div className="p-6 border-b border-neutral-100">
                   <h3 className="text-lg font-semibold text-neutral-900">{client.full_name}</h3>
                   <p className="text-sm text-neutral-500 mb-4">{client.companies?.name || 'Independent'}</p>

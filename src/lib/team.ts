@@ -1,5 +1,4 @@
 // Server-only: uses the service-role client and request cookies
-import { randomBytes } from 'crypto'
 import type { SupabaseClient, User } from '@supabase/supabase-js'
 import { createClient as createServerClient } from '@/lib/supabase/server'
 
@@ -10,7 +9,8 @@ export type Member = { id: string; full_name: string; email: string; role: Role;
 export const canManageTeam = (role?: string | null) => role === 'owner' || role === 'admin'
 
 export function tempPassword() {
-  return randomBytes(9).toString('base64url')
+  const bytes = globalThis.crypto.getRandomValues(new Uint8Array(9))
+  return btoa(String.fromCharCode(...Array.from(bytes))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
 }
 
 export async function currentAuthUser(): Promise<User | null> {

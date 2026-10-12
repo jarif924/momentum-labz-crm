@@ -58,3 +58,4 @@ export async function PATCH(req: Request) {
     return NextResponse.json({ error: e instanceof Error ? e.message : 'Unknown error' }, { status: 500 })
   }
 }
+export const runtime = 'edge';

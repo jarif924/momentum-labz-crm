@@ -66,6 +66,63 @@ function PasswordReveal({ open, name, email, password, onClose }: { open: boolea
 
 // ─── Team ─────────────────────────────────────────────────────
 
+
+function EditMemberModal({ open, member, onClose, onChange }: { open: boolean; member: Member | null; onClose: () => void; onChange: () => void }) {
+  const toast = useToast()
+  const [saving, setSaving] = useState(false)
+  const [form, setForm] = useState({ full_name: '', role: 'sales' as Role, avatar_url: null as string | null })
+  
+  useEffect(() => {
+    if (member) setForm({ full_name: member.full_name, role: member.role, avatar_url: member.avatar_url ?? null })
+  }, [member])
+
+  async function save() {
+    if (!member) return
+    setSaving(true)
+    try {
+      await api('/api/team', { method: 'PATCH', body: JSON.stringify({ id: member.id, role: form.role, full_name: form.full_name, avatar_url: form.avatar_url }) })
+      
+      toast.success('Member updated')
+      onChange()
+      onClose()
+    } catch (e) {
+      toast.error((e as Error).message)
+    }
+    setSaving(false)
+  }
+
+  if (!member) return null
+
+  return (
+    <Modal isOpen={open} onClose={onClose} title="Edit team member" maxWidth="md">
+      <div className="flex flex-col gap-6">
+        <div className="flex flex-col gap-2">
+          <label className="text-sm font-medium text-neutral-900">Profile Photo</label>
+          <AvatarUploader 
+            url={form.avatar_url} 
+            name={form.full_name} 
+            onUpload={async (url) => setForm(f => ({ ...f, avatar_url: url }))} 
+          />
+        </div>
+        <Input label="Full name" value={form.full_name} onChange={e => setForm(f => ({ ...f, full_name: e.target.value }))} />
+        <Select 
+          label="Role" 
+          value={form.role} 
+          onChange={e => setForm(f => ({ ...f, role: e.target.value as Role }))}
+        >
+          {Object.entries(ROLE_INFO).map(([k, v]) => (
+            <option key={k} value={k}>{v.label} - {v.hint}</option>
+          ))}
+        </Select>
+        <div className="flex justify-end gap-3 mt-2">
+          <Button variant="secondary" onClick={onClose} disabled={saving}>Cancel</Button>
+          <Button onClick={save} disabled={saving || !form.full_name.trim()}>{saving ? 'Saving…' : 'Save changes'}</Button>
+        </div>
+      </div>
+    </Modal>
+  )
+}
+
 export function TeamSection() {
   const toast = useToast()
   const [members, setMembers] = useState<Member[]>([])
@@ -78,6 +135,7 @@ export function TeamSection() {
   const [reveal, setReveal] = useState<{ name: string; email: string; password: string } | null>(null)
   const [toRemove, setToRemove] = useState<Member | null>(null)
   const [toReset, setToReset] = useState<Member | null>(null)
+  const [toEdit, setToEdit] = useState<Member | null>(null)
   const [busy, setBusy] = useState(false)
 
   const load = useCallback(async () => {
@@ -208,7 +266,12 @@ export function TeamSection() {
                   )}
                   {canManage && !isMe && !ownerLocked && (
                     <>
+                      
+                      <IconButton label={`Edit ${m.full_name}`} onClick={() => setToEdit(m)}>
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg>
+                      </IconButton>
                       <IconButton label={m.has_login ? `Reset password for ${m.full_name}` : `Create login for ${m.full_name}`} onClick={() => setToReset(m)}>
+
                         <KeyRound size={16} strokeWidth={1.75} />
                       </IconButton>
                       <IconButton label={`Remove ${m.full_name}`} tone="danger" onClick={() => setToRemove(m)}>
@@ -223,7 +286,11 @@ export function TeamSection() {
         )}
       </Card>
 
+      
+      <EditMemberModal open={!!toEdit} member={toEdit} onClose={() => setToEdit(null)} onChange={load} />
       <ConfirmDialog
+
+
         open={!!toRemove}
         title={`Remove ${toRemove?.full_name}?`}
         message="They will be signed out and can no longer sign in. Tasks and leads assigned to them become unassigned."

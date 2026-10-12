@@ -1,4 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
+import Link from 'next/link';
 import React, { useState, useEffect } from 'react';
 import { Modal } from '@/components/ui/Modal';
 import { Button, Input, Select } from '@/components/ui/Forms';
@@ -190,6 +191,7 @@ export function TaskModal({
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} title={task ? 'Edit Task' : 'New Task'} maxWidth="xl">
+      {task?.brainstorm_note_id && <Link href={`/brainstorming?note=${task.brainstorm_note_id}`} className="inline-block text-small text-info-text underline mb-4">Open source note</Link>}
       <div className="flex flex-col md:flex-row gap-8">
         {/* Main Column */}
         <div className="flex-1 flex flex-col gap-4">
