@@ -3,8 +3,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { createBrowserClient } from '@supabase/ssr';
-import { Database } from '@/types/supabase';
+import { createClient } from '@/lib/supabase/client';
 import { Button } from '@/components/ui/Forms';
 import { Plus, List, LayoutGrid, Tag } from 'lucide-react';
 import { Modal } from '@/components/ui/Modal';
@@ -19,10 +18,7 @@ import { friendlyError } from '@/lib/errors';
 const DEFAULT_LOST_REASONS = ['Price too high', 'Bad timing', 'Went with a competitor', 'Went cold', 'Other'];
 
 export default function LeadsPage() {
-  const supabase = createBrowserClient<Database>(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  );
+  const supabase = createClient();
 
   const [view, setView] = useState<'list' | 'kanban'>('kanban');
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

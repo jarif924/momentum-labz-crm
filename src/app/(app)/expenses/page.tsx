@@ -2,8 +2,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { createBrowserClient } from '@supabase/ssr'
-import { Database } from '@/types/supabase'
+import { createClient } from '@/lib/supabase/client'
 import { Plus, Edit2, Trash2, ArrowDownLeft } from 'lucide-react'
 import { Button, Input, Select } from '@/components/ui/Forms'
 import { Modal } from '@/components/ui/Modal'
@@ -35,10 +34,7 @@ function fmt(amount: number, currency: string) {
 }
 
 export default function ExpensesPage() {
-  const supabase = createBrowserClient<Database>(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  )
+  const supabase = createClient()
 
   const [expenses, setExpenses] = useState<any[]>([])
   const [leads, setLeads] = useState<any[]>([])

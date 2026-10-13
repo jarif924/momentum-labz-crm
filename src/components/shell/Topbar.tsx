@@ -17,13 +17,27 @@ import { friendlyError } from '@/lib/errors'
 const ROLE_LABELS: Record<string, string> = { owner: 'Owner', admin: 'Admin', sales: 'Sales', viewer: 'Viewer' }
 
 export function Topbar() {
-  const [profile, setProfile] = useState<{ full_name: string; role: string | null; avatar_url?: string | null } | null>(null)
+  const [profile, setProfile] = useState<{ full_name: string; role: string | null; avatar_url?: string | null } | null>(() => {
+    if (typeof window === 'undefined') return null
+    try {
+      const cached = sessionStorage.getItem('crm_profile_cache')
+      return cached ? JSON.parse(cached) : null
+    } catch {
+      return null
+    }
+  })
 
   // Signed-in person's name and role; refreshed when they rename themselves in My account
   useEffect(() => {
     const load = () => fetch('/api/team/me')
       .then(r => (r.ok && r.headers.get('content-type')?.includes('application/json') ? r.json() : null))
-      .then(p => { if (p) setProfile({ full_name: p.full_name, role: p.role }) })
+      .then(p => {
+        if (p) {
+          const profileData = { full_name: p.full_name, role: p.role, avatar_url: p.avatar_url }
+          setProfile(profileData)
+          try { sessionStorage.setItem('crm_profile_cache', JSON.stringify(profileData)) } catch {}
+        }
+      })
       .catch(() => {})
     load()
     window.addEventListener('profile-updated', load)

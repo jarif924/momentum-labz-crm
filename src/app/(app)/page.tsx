@@ -42,17 +42,33 @@ export default async function DashboardPage({ searchParams }: { searchParams: { 
     redirect('/login');
   }
 
-  const { data: dbUser } = await supabase.from('users').select('role').eq('id', user.id).single();
-  const role = dbUser?.role || 'member';
   const period = searchParams.period || 'this_month';
-
   const { start, end, prevStart, prevEnd } = getPeriodDates(period);
   const now = new Date();
   const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
   const endOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999).toISOString();
   const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString();
 
-  // Build Queries
+  // Run role lookup concurrently with independent global queries
+  const [
+    dbUserRes,
+    { count: overdueInvoices },
+    { data: paidInvoices },
+    { data: allInvoices },
+    { data: openPipelineData },
+    { data: pipelineStages }
+  ] = await Promise.all([
+    supabase.from('users').select('role').eq('id', user.id).single(),
+    supabase.from('invoices').select('*', { count: 'exact', head: true }).eq('status', 'unpaid').lt('due_date', now.toISOString()),
+    supabase.from('invoices').select('amount, paid_at, currency').eq('status', 'paid').gte('paid_at', prevStart).lte('paid_at', end),
+    supabase.from('invoices').select('amount, type, status, currency, is_retainer'),
+    supabase.from('leads').select('deal_value, stage, currency'),
+    supabase.from('pipeline_stages').select('*').order('sort_order'),
+  ]);
+
+  const role = dbUserRes.data?.role || 'member';
+
+  // Build Role-Specific Queries
   let overdueTasksQ = supabase.from('tasks').select('*', { count: 'exact', head: true }).eq('completed', false).lt('due_at', now.toISOString());
   let followupsQ = supabase.from('leads').select('*', { count: 'exact', head: true }).gte('next_action_date', startOfToday).lte('next_action_date', endOfToday);
   let staleLeadsQ = supabase.from('leads').select('*', { count: 'exact', head: true }).lt('updated_at', thirtyDaysAgo).not('stage', 'eq', 'Won').not('stage', 'eq', 'Lost');
@@ -72,27 +88,17 @@ export default async function DashboardPage({ searchParams }: { searchParams: { 
   }
 
   const [
-    { count: overdueInvoices },
     { count: overdueTasks },
     { count: followupsToday },
     { count: staleLeads },
-    { data: paidInvoices },
-    { data: allInvoices },
-    { data: openPipelineData },
-    { data: pipelineStages },
     { data: focusTasksData },
     { data: focusLeadsData },
     { data: usersData },
     { data: teamTasksData }
   ] = await Promise.all([
-    supabase.from('invoices').select('*', { count: 'exact', head: true }).eq('status', 'unpaid').lt('due_date', now.toISOString()),
     overdueTasksQ,
     followupsQ,
     staleLeadsQ,
-    supabase.from('invoices').select('amount, paid_at, currency').eq('status', 'paid').gte('paid_at', prevStart).lte('paid_at', end),
-    supabase.from('invoices').select('amount, type, status, currency, is_retainer'),
-    supabase.from('leads').select('deal_value, stage, currency'),
-    supabase.from('pipeline_stages').select('*').order('sort_order'),
     focusTasksQ,
     focusLeadsQ,
     teamUsersQ,

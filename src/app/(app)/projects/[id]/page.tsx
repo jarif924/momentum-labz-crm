@@ -2,18 +2,14 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { createBrowserClient } from '@supabase/ssr'
-import { Database } from '@/types/supabase'
+import { createClient } from '@/lib/supabase/client'
 import { ChevronLeft, Link as LinkIcon, Eye, CheckCircle2, ArrowUpRight } from 'lucide-react'
 import Link from 'next/link'
 import { useToast } from '@/components/ui/Toast'
 import { friendlyError } from '@/lib/errors'
 
 export default function ProjectDetailPage({ params }: { params: { id: string } }) {
-  const supabase = createBrowserClient<Database>(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  )
+  const supabase = createClient()
 
   const [project, setProject] = useState<any>(null)
   const [tasks, setTasks] = useState<any[]>([])

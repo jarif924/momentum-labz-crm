@@ -3,7 +3,7 @@ import Link from 'next/link';
 import React, { useState, useEffect } from 'react';
 import { Modal } from '@/components/ui/Modal';
 import { Button, Input, Select } from '@/components/ui/Forms';
-import { createBrowserClient } from '@supabase/ssr';
+import { createClient } from '@/lib/supabase/client';
 import { Plus, Trash2 } from 'lucide-react';
 import { useToast } from '@/components/ui/Toast';
 import { friendlyError } from '@/lib/errors';
@@ -25,10 +25,7 @@ export function TaskModal({
   users?: any[],
   onSave?: () => void 
 }) {
-  const supabase = createBrowserClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  );
+  const supabase = createClient();
 
   const [loading, setLoading] = useState(false);
   const toast = useToast();

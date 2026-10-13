@@ -4,8 +4,7 @@
 import { useState, useEffect } from 'react';
 import { Modal } from '@/components/ui/Modal';
 import { Button, Input, Select } from '@/components/ui/Forms';
-import { createBrowserClient } from '@supabase/ssr';
-import { Database } from '@/types/supabase';
+import { createClient } from '@/lib/supabase/client';
 import { useToast } from '@/components/ui/Toast';
 import { friendlyError } from '@/lib/errors';
 import { CustomFieldInput } from '@/components/ui/CustomFieldInput';
@@ -13,10 +12,7 @@ import { validateCustomFields, type CustomFieldDef } from '@/lib/customFields';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function LeadFormModal({ isOpen, onClose, lead, onSave }: { isOpen: boolean, onClose: () => void, lead?: any, onSave: () => void }) {
-  const supabase = createBrowserClient<Database>(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  );
+  const supabase = createClient();
 
   const [formData, setFormData] = useState<any>({
     contact_id: '',

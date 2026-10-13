@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 // Server-only: uses the service-role client and request cookies
 import type { SupabaseClient, User } from '@supabase/supabase-js'
 import { createClient as createServerClient } from '@/lib/supabase/server'
@@ -42,10 +43,15 @@ export async function findAuthUserByEmail(admin: SupabaseClient, email: string) 
  * First run: when nobody is on the team yet, the earliest-created login becomes the Owner.
  * Deterministic, so it doesn't matter who happens to load a page first.
  */
+let ownerBootstrapped = false
 export async function bootstrapOwner(admin: SupabaseClient) {
+  if (ownerBootstrapped) return
   const { count, error } = await admin.from('users').select('id', { count: 'exact', head: true })
   if (error) throw error
-  if ((count ?? 0) > 0) return
+  if ((count ?? 0) > 0) {
+    ownerBootstrapped = true
+    return
+  }
   const first = (await listAuthUsers(admin)).sort((a, b) => a.created_at.localeCompare(b.created_at))[0]
   if (!first?.email) return
   const meta = (first.user_metadata ?? {}) as { full_name?: string }
@@ -55,6 +61,7 @@ export async function bootstrapOwner(admin: SupabaseClient) {
     full_name: meta.full_name || first.email.split('@')[0],
     role: 'owner',
   })
+  ownerBootstrapped = true
 }
 
 export async function getMember(admin: SupabaseClient, id: string): Promise<Member | null> {

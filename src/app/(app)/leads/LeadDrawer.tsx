@@ -5,8 +5,7 @@ import { X, Mail, Phone, ExternalLink, FileText, Printer, Calendar, Clock, Check
 import { Button, Input } from '@/components/ui/Forms';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { FileText as FileTextIcon, Receipt, Activity } from 'lucide-react';
-import { createBrowserClient } from '@supabase/ssr';
-import { Database } from '@/types/supabase';
+import { createClient } from '@/lib/supabase/client';
 import { useToast } from '@/components/ui/Toast';
 import { friendlyError } from '@/lib/errors';
 import { formatCustomValue, type CustomFieldDef } from '@/lib/customFields';
@@ -16,10 +15,7 @@ const ACTIVITY_CHANNELS = ['whatsapp', 'email', 'instagram_dm', 'call', 'meeting
 const ACTION_LABELS: Record<string, string> = { call: 'Call', email: 'Email', meeting: 'Meeting', demo: 'Demo', follow_up: 'Follow Up' };
 
 export function LeadDrawer({ isOpen, onClose, lead }: { isOpen: boolean, onClose: () => void, lead: any }) {
-  const supabase = createBrowserClient<Database>(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  );
+  const supabase = createClient();
 
   const [activities, setActivities] = useState<any[]>([]);
   const [proposals, setProposals] = useState<any[]>([]);

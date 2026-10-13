@@ -2,8 +2,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { createBrowserClient } from '@supabase/ssr'
-import { Database } from '@/types/supabase'
+import { createClient } from '@/lib/supabase/client'
 import { Button, Input, Select } from '@/components/ui/Forms'
 import { Modal } from '@/components/ui/Modal'
 import { Plus, Edit2, Trash2, Receipt, Printer, X, RefreshCw } from 'lucide-react'
@@ -45,10 +44,7 @@ function StatusBadge({ status }: { status: string }) {
 }
 
 export default function InvoicesPage() {
-  const supabase = createBrowserClient<Database>(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  )
+  const supabase = createClient()
 
   const [invoices, setInvoices] = useState<any[]>([])
   const [leads, setLeads] = useState<any[]>([])

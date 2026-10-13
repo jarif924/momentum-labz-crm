@@ -2,8 +2,7 @@
 'use client'
 
 import { useState, useEffect, useMemo } from 'react'
-import { createBrowserClient } from '@supabase/ssr'
-import { Database } from '@/types/supabase'
+import { createClient } from '@/lib/supabase/client'
 import { TrendingUp, Users, Target, Clock, Globe, PieChart } from 'lucide-react'
 
 function StatCard({ label, value, sub, icon: Icon, accent }: any) {
@@ -24,10 +23,7 @@ function StatCard({ label, value, sub, icon: Icon, accent }: any) {
 }
 
 export default function AnalyticsPage() {
-  const supabase = createBrowserClient<Database>(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  )
+  const supabase = createClient()
 
   const [loading, setLoading] = useState(true)
   const [leads, setLeads] = useState<any[]>([])

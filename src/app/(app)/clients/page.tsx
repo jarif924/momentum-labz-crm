@@ -2,15 +2,11 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { createBrowserClient } from '@supabase/ssr';
-import { Database } from '@/types/supabase';
+import { createClient } from '@/lib/supabase/client';
 import { Briefcase, Mail, Phone, ExternalLink, MessageCircle } from 'lucide-react';
 
 export default function ClientsPage() {
-  const supabase = createBrowserClient<Database>(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  );
+  const supabase = createClient();
 
   const [clients, setClients] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);

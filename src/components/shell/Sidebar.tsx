@@ -154,6 +154,7 @@ export function Sidebar() {
                   <li key={item.href}>
                     <Link
                       href={item.href}
+                      prefetch={true}
                       className={`
                         flex items-center gap-3 h-10 px-3 rounded-md
                         text-body-medium

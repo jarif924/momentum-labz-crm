@@ -3,8 +3,7 @@ import { Avatar } from '@/components/ui/Avatar';
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 import { useState, useEffect } from 'react';
-import { createBrowserClient } from '@supabase/ssr';
-import { Database } from '@/types/supabase';
+import { createClient } from '@/lib/supabase/client';
 import { Button } from '@/components/ui/Forms';
 import { Plus, List, LayoutGrid, AlertOctagon, CheckCircle2, Circle, MessageSquareWarning } from 'lucide-react';
 import { TasksKanban } from './TasksKanban';
@@ -13,10 +12,7 @@ import { useToast } from '@/components/ui/Toast';
 import { friendlyError } from '@/lib/errors';
 
 export default function TasksPage() {
-  const supabase = createBrowserClient<Database>(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  );
+  const supabase = createClient();
 
   const [tasks, setTasks] = useState<any[]>([]);
   const [projects, setProjects] = useState<any[]>([]);
