@@ -35,7 +35,7 @@ export default function TasksPage() {
 
   const fetchData = async () => {
     const [tRes, pRes, bRes, lRes, uRes] = await Promise.all([
-      supabase.from('tasks').select('*, project:projects(name, status), users(full_name, avatar_url)').order('created_at', { ascending: false }),
+      supabase.from('tasks').select('*, project:projects(name, status), users:users!tasks_assigned_to_fkey(full_name, avatar_url)').order('created_at', { ascending: false }),
       supabase.from('projects').select('*'),
       supabase.from('task_comments').select('*, task:tasks(title, project_id, project:projects(name))').or('is_blocker.eq.true,is_decision.eq.true').order('created_at', { ascending: false }),
       supabase.from('leads').select('id, contacts(full_name)'),

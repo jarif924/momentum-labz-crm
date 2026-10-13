@@ -1,5 +1,5 @@
 {
-  "id": "f206a420-0a94-4319-971b-c96a96db499f",
+  "id": "dd18c8de-a09a-4887-9bc3-74c43300de4e",
   "checks": [
     "Slash real menu",
     "Selection toolbar strike highlight clear",
@@ -8,14 +8,5 @@
     "PNG upload and reload rendering",
     "Mobile controls move and no overflow"
   ],
-  "failures": [
-    {
-      "name": "Toggle hides and reveals children",
-      "error": "The expression evaluated to a falsy value:\n\n  assert.ok(n.document.some(x=>x.type==='toggleListItem'&&x.children?.length))\n"
-    },
-    {
-      "name": "Move up down changes order",
-      "error": "The expression evaluated to a falsy value:\n\n  assert.ok(s.indexOf('Move_A')<s.indexOf('Move_B'))\n"
-    }
-  ]
+  "failures": []
 }

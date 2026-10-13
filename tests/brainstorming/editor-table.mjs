@@ -1,1 +1,32 @@
-import {launch,login,newNote} from './helpers.mjs';import assert from 'node:assert/strict';const b=await launch(),{page:p}=await login(b);await newNote(p,'Audit1 table '+Date.now());await p.locator('select[aria-label="Add block"]').selectOption('table');const td=p.locator('.bn-editor table td').first();await td.click();await p.keyboard.insertText('Table cell');const dump=async()=>{console.log('STYLE',await p.locator('.bn-table-handle,.bn-formatting-toolbar').evaluateAll(es=>es.map(el=>{let e=el;const out=[];while(e&&out.length<5){out.push({class:e.className,z:getComputedStyle(e).zIndex,position:getComputedStyle(e).position,style:e.getAttribute('style')});e=e.parentElement;}return out})));console.log('TOOLBARCOUNT',await p.locator('.bn-formatting-toolbar:visible').count());};await td.hover();await p.getByRole('button',{name:'Table row actions',exact:true}).click();await p.getByRole('menuitem',{name:'Add row below',exact:true}).click();assert.equal(await p.locator('table tr').count(),3);await td.hover();await p.getByRole('button',{name:'Table row actions',exact:true}).click();await dump();await p.getByRole('menuitem',{name:'Delete row',exact:true}).click();assert.equal(await p.locator('table tr').count(),2);await p.locator('table td').first().hover();await p.getByRole('button',{name:'Table column actions',exact:true}).click();await p.getByRole('menuitem',{name:'Add column right',exact:true}).click();assert.equal(await p.locator('table tr').first().locator('td').count(),4);await p.locator('table td').first().hover();await p.getByRole('button',{name:'Table column actions',exact:true}).click();await p.getByRole('menuitem',{name:'Delete column',exact:true}).click();assert.equal(await p.locator('table tr').first().locator('td').count(),3);console.log('PASS table4 actions');await b.close();
+import assert from 'node:assert/strict';
+import { launch, login, newNote } from './helpers.mjs';
+
+const browser = await launch();
+const { page } = await login(browser);
+await newNote(page, `Audit table ${Date.now()}`);
+await page.getByLabel('Add block').selectOption('table');
+await page.locator('.bn-editor table td').first().click();
+await page.keyboard.insertText('Table cell');
+
+async function menu(label, item) {
+  await page.locator('.bn-editor table td').first().hover();
+  const handle = page.getByRole('button', { name: label, exact: true });
+  await handle.waitFor();
+  await handle.click();
+  const action = page.getByRole('menuitem', { name: item, exact: true });
+  await action.waitFor({ timeout: 10000 });
+  await action.click();
+  await action.waitFor({ state: 'hidden' });
+}
+
+await menu('Table row actions', 'Add row below');
+assert.equal(await page.locator('.bn-editor table tr').count(), 3);
+await menu('Table row actions', 'Delete row');
+assert.equal(await page.locator('.bn-editor table tr').count(), 2);
+await menu('Table column actions', 'Add column right');
+assert.equal(await page.locator('.bn-editor table tr').first().locator('td').count(), 4);
+await menu('Table column actions', 'Delete column');
+assert.equal(await page.locator('.bn-editor table tr').first().locator('td').count(), 3);
+
+console.log('PASS table row and column actions');
+await browser.close();

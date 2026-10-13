@@ -39,7 +39,7 @@ export default function NoteEditor({noteId,document,editable,onChange,onTask}:{n
   function current(){return editor.getTextCursorPosition().block;}
   function move(direction:'up'|'down'){const block=current();if(direction==='up')editor.moveBlocksUp(block);else editor.moveBlocksDown(block);editor.setTextCursorPosition(block.id,'end');editor.focus();}
   function duplicate(){const b=current();const clone=(b:any):any=>({...b,id:undefined,children:b.children?.map(clone)});editor.insertBlocks([clone(b)],b,'after');setMenu(false);}
-  function task(){const selected=editor.getSelectedText()||plainText(current().content);if(selected.trim())onTask?.(selected);else setError('Select text or write a checklist item first.');}
+  function task(){const selected=(editor.getSelectedText()||plainText(current().content)).trim();if(selected)onTask?.(selected);else setError('Select text or write a checklist item first.');}
   const icon=(label:string,Icon:any,action:()=>void)=><Button variant="ghost" size="compact" title={label} aria-label={label} onMouseDown={e=>e.preventDefault()} onClick={action}><Icon size={16} strokeWidth={1.75}/></Button>;
   return <div className="bn-workspace">
     {editable&&<div className="bn-actionbar flex flex-wrap gap-1 items-center border-b border-neutral-100 p-2 mb-4">
@@ -57,7 +57,7 @@ export default function NoteEditor({noteId,document,editable,onChange,onTask}:{n
       {editable&&<AccessibleTableControls onMenuOpenChange={setTableMenuOpen}/>}
       {!tableMenuOpen&&<FormattingToolbarController formattingToolbar={()=><FormattingToolbar>
         <BasicTextStyleButton basicTextStyle="bold"/><BasicTextStyleButton basicTextStyle="italic"/><BasicTextStyleButton basicTextStyle="underline"/><BasicTextStyleButton basicTextStyle="strike"/>
-        {icon('Highlight',Highlighter,()=>editor.toggleStyles({backgroundColor:'yellow'}))}<CreateLinkButton/>{icon('Remove link',Link2Off,()=>{editor.deleteLink();editor.focus();})}
+        {icon('Highlight',Highlighter,()=>editor.toggleStyles({backgroundColor:'yellow'}))}<CreateLinkButton/>{icon('Unlink selection',Link2Off,()=>{editor.deleteLink();editor.focus();})}
         {icon('Clear formatting',RemoveFormatting,()=>editor.removeStyles(editor.getActiveStyles()))}
         {onTask&&icon('Convert to Task',ListPlus,task)}
       </FormattingToolbar>}/> }

@@ -1,23 +1,13 @@
 {
-  "id": "033bf46e-1f65-444b-bead-1f42931d6424",
+  "id": "6e2df39c-9c4e-4433-944e-e14ddd31fd31",
   "checks": [
     "Move up/down without focus loss",
+    "Toggle child collapse expand",
+    "Table add remove row and column",
+    "Create edit remove link",
     "Bengali composition preserves typing",
     "Oversize image error",
     "Image clipboard paste"
   ],
-  "failures": [
-    {
-      "name": "Toggle child collapse expand",
-      "error": "locator.waitFor: Timeout 15000ms exceeded.\nCall log:\n\u001b[2m  - waiting for locator('.bn-inline-content').filter({ hasText: 'Collapse child' }).last() to be visible\u001b[22m\n\u001b[2m    33 × locator resolved to hidden <p class=\"bn-inline-content\">Collapse child</p>\u001b[22m\n"
-    },
-    {
-      "name": "Table add remove row and column",
-      "error": "locator.click: Timeout 15000ms exceeded.\nCall log:\n\u001b[2m  - waiting for getByRole('menuitem', { name: 'Delete row', exact: true })\u001b[22m\n\u001b[2m    - locator resolved to <button type=\"button\" tabindex=\"-1\" role=\"menuitem\" data-menu-item=\"true\" data-mantine-stop-propagation=\"true\" class=\"mantine-focus-auto m_99ac2aa1 mantine-Menu-item m_87cf2631 mantine-UnstyledButton-root\">…</button>\u001b[22m\n\u001b[2m  - attempting click action\u001b[22m\n\u001b[2m    2 × waiting for element to be visible, enabled and stable\u001b[22m\n\u001b[2m      - element is visible, enabled and stable\u001b[22m\n\u001b[2m      - scrolling into view if needed\u001b[22m\n\u001b[2m      - done scrolling\u001b[22m\n\u001b[2m      - <div role=\"toolbar\" class=\"bn-toolbar bn-formatting-toolbar m_8bffd616 mantine-Flex-root __m__-r16\">…</div> from <div id=\":r11:\" data-floating-ui-portal=\"\">…</div> subtree intercepts pointer events\u001b[22m\n\u001b[2m    - retrying click action\u001b[22m\n\u001b[2m    - waiting 20ms\u001b[22m\n\u001b[2m    - waiting for element to be visible, enabled and stable\u001b[22m\n\u001b[2m    - element is visible, enabled and stable\u001b[22m\n\u001b[2m    - scrolling into view if needed\u001b[22m\n\u001b[2m    - done scrolling\u001b[22m\n\u001b[2m    - <div role=\"toolbar\" class=\"bn-toolbar bn-formatting-toolbar m_8bffd616 mantine-Flex-root __m__-r16\">…</div> from <div id=\":r11:\" data-floating-ui-portal=\"\">…</div> subtree intercepts pointer events\u001b[22m\n\u001b[2m  - retrying click action\u001b[22m\n\u001b[2m    - waiting 100ms\u001b[22m\n\u001b[2m    - waiting for element to be visible, enabled and stable\u001b[22m\n\u001b[2m  - element was detached from the DOM, retrying\u001b[22m\n"
-    },
-    {
-      "name": "Create edit remove link",
-      "error": "locator.waitFor: Timeout 15000ms exceeded.\nCall log:\n\u001b[2m  - waiting for locator('.bn-editor a').filter({ hasText: 'LinkWord' }) to be detached\u001b[22m\n\u001b[2m    31 × locator resolved to visible <a target=\"_blank\" rel=\"noopener noreferrer\" data-inline-content-type=\"link\" href=\"https://example.com/second\" classname=\"bn-inline-content-section\">LinkWord</a>\u001b[22m\n"
-    }
-  ]
+  "failures": []
 }

@@ -14,4 +14,6 @@
 .brainstorming .bn-callout {display:flex;gap:12px;padding:16px;background:var(--accent-50);border-radius:var(--radius-md);width:100%;}
 .brainstorming .bn-callout>div {flex:1;min-width:0;}
 .brainstorming .bn-toolbar {border-radius:var(--radius-md);border:1px solid var(--neutral-100);box-shadow:var(--shadow-md);flex-wrap:wrap;max-width:calc(100vw - 24px);}
+.brainstorming .bn-root div:has(> .bn-formatting-toolbar) {z-index:2 !important;}
+body:has(.brainstorming) .bn-formatting-toolbar [data-test="removelink"] {display:none !important;}
 @media(max-width:639px){.brainstorming .bn-editor{padding:12px 20px 140px 24px;}.brainstorming button{min-height:40px;}.brainstorming .bn-actionbar{position:sticky;top:0;z-index:10;background:var(--neutral-0);}.brainstorming input,.brainstorming textarea{font-size:16px;}}

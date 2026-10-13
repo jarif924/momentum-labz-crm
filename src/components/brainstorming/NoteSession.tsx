@@ -11,7 +11,7 @@ import { Comments } from './Comments';
 import { useToast } from '@/components/ui/Toast';
 import { ArrowLeft,History,MessageSquare,Pin,Save,Trash2,Copy } from 'lucide-react';
 const NoteEditor=dynamic(()=>import('./NoteEditor'),{ssr:false,loading:()=> <p className="p-6 text-small">Loading editor…</p>});
-export type SessionHandle={flush:()=>Promise<boolean>};
+export type SessionHandle={flush:()=>Promise<boolean>;release:()=>Promise<void>};
 export function NoteSession({initial,me,members,tags,links,onSaved,onBack,onDuplicate,onTags,onRemoved,handle}:{initial:Note;me:Member;members:Member[];tags:string[];links:any[];onSaved:(n:Note)=>void;onBack:()=>void;onDuplicate:(n:Note)=>void;onTags:()=>void;onRemoved:()=>void;handle:React.MutableRefObject<SessionHandle|null>}){
  const client=useRef(createClient()).current,toast=useToast();
  const [note,setNote]=useState(initial),[status,setStatus]=useState('Saved'),[error,setError]=useState(''),[editable,setEditable]=useState(false),[lockOwner,setLockOwner]=useState(''),[comments,setComments]=useState(false),[epoch,setEpoch]=useState(0),[denied,setDenied]=useState(false);
@@ -20,7 +20,7 @@ export function NoteSession({initial,me,members,tags,links,onSaved,onBack,onDupl
  if(!token.current){const lockKey=`momentum-brainstorm-lock:${me.id}:${initial.id}`;try{token.current=sessionStorage.getItem(lockKey)||crypto.randomUUID();sessionStorage.setItem(lockKey,token.current);}catch{token.current=crypto.randomUUID();}}
  const key=draftKey(me.id,initial.id),isAdmin=['owner','admin'].includes(me.role),canWrite=me.role!=='viewer'&&!note.deleted_at;
  const flush=useCallback(async():Promise<boolean>=>{
-  if(flight.current)return flight.current;
+  if(flight.current){const completed=await flight.current;return completed&&(generation.current>saved.current?flush():true);}
   if(generation.current===saved.current)return true;
   clearTimeout(timer.current);
   flight.current=(async()=>{
@@ -40,7 +40,7 @@ export function NoteSession({initial,me,members,tags,links,onSaved,onBack,onDupl
    }finally{flight.current=null;}
   })();return flight.current;
  },[client,initial.id,key,onSaved]);
- handle.current={flush};
+ handle.current={flush,release:async()=>{await client.rpc('bn_lock',{p_note:initial.id,p_token:token.current,p_release:true});}};
  function change(patch:Partial<Note>){if(!editable)return;lastActivity.current=Date.now();current.current={...current.current,...patch};generation.current++;setNote(current.current);setStatus('Unsaved changes');
   try{localStorage.setItem(key,JSON.stringify({note:current.current,baseVersion:version.current}));}catch{setError('Browser storage is full. Keep this page open until the server saves.');}
   clearTimeout(timer.current);timer.current=setTimeout(()=>void flush(),1500);
