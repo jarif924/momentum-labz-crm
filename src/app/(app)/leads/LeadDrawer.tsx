@@ -158,7 +158,7 @@ export function LeadDrawer({ isOpen, onClose, lead }: { isOpen: boolean, onClose
       <div className="fixed inset-y-0 right-0 w-full md:w-[480px] bg-neutral-0 shadow-2xl z-50 flex flex-col transform transition-transform duration-300 ease-out border-l border-neutral-100">
         
         {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-neutral-100">
+        <div className="flex items-center justify-between p-4 sm:p-6 border-b border-neutral-100">
           <div>
             <h2 className="text-xl font-semibold text-neutral-900">{lead.contacts?.full_name}</h2>
             {lead.companies?.name && <p className="text-sm text-neutral-500 mt-1">{lead.companies.name}</p>}
@@ -174,13 +174,13 @@ export function LeadDrawer({ isOpen, onClose, lead }: { isOpen: boolean, onClose
           )}
 
           </div>
-          <button onClick={onClose} className="p-2 text-neutral-400 hover:text-neutral-900 hover:bg-neutral-50 rounded-full transition-colors">
+          <button onClick={onClose} aria-label="Close lead details" className="p-2 text-neutral-400 hover:text-neutral-900 hover:bg-neutral-50 rounded-full transition-colors">
             <X size={20} />
           </button>
         </div>
 
         {/* Content */}
-        <div className="flex-1 overflow-y-auto p-6 flex flex-col gap-8">
+        <div className="flex-1 overflow-y-auto p-4 sm:p-6 flex flex-col gap-6 sm:gap-8 min-w-0">
           
           
           {/* Next Action Box (Pipedrive Style) */}
@@ -247,6 +247,25 @@ export function LeadDrawer({ isOpen, onClose, lead }: { isOpen: boolean, onClose
               </div>
             )}
           </div>
+
+          {/* Website enquiries show the actual brief at the top, not buried in raw JSON. */}
+          {lead.source === 'website_enquiry' && (
+            <section className="rounded-xl border border-emerald-200 bg-emerald-50/40 p-4 sm:p-5 min-w-0" aria-label="Website enquiry details">
+              <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+                <h3 className="text-sm font-semibold text-emerald-900">Website enquiry</h3>
+                <span className="text-[11px] uppercase tracking-wider text-emerald-700 font-semibold">Inbound lead</span>
+              </div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-emerald-800">Interested in</p>
+              <p className="text-sm font-semibold text-neutral-900 mt-1 break-words">{lead.custom_fields?.interest || lead.services?.[0] || 'Project enquiry'}</p>
+              <p className="text-xs font-semibold uppercase tracking-wide text-emerald-800 mt-4">Project request</p>
+              <p className="text-sm text-neutral-800 leading-relaxed whitespace-pre-wrap break-words mt-1">{lead.custom_fields?.project_goal || 'No brief provided.'}</p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 border-t border-emerald-200 pt-3 mt-4">
+                <div><p className="text-[11px] text-emerald-800 uppercase font-semibold">Location</p><p className="text-sm text-neutral-800">{lead.custom_fields?.country || 'Needs confirmation'}</p></div>
+                <div><p className="text-[11px] text-emerald-800 uppercase font-semibold">Campaign</p><p className="text-sm text-neutral-800 break-words">{lead.utm_campaign || lead.utm_source || 'Direct / not tagged'}</p></div>
+              </div>
+              {lead.custom_fields?.website && <p className="text-xs text-emerald-900 mt-3 break-all">Website: {lead.custom_fields.website}</p>}
+            </section>
+          )}
 
           {/* Quick Info */}
 
